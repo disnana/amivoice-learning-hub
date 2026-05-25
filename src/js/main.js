@@ -24,6 +24,7 @@ import { setIconRoot } from "./utils/dom.js";
 const app = document.querySelector("#app");
 let recordingIndex = null; // 現在どのインデックスのカードが録音中か
 let currentAudio = null; // 現在再生中のオーディオオブジェクト (Google TTS用)
+let isQueuePlaying = false; // 連続再生中かどうかのフラグ
 
 function readSettingsFromDom() {
   const hasSettingsModal = Boolean(document.querySelector("#geminiApiKey"));
@@ -142,6 +143,7 @@ function render() {
         render();
       },
       onSpeak: (text, index) => handleSpeak(text, index),
+      onSpeakAll: handleSpeakAll,
     }),
     historyPanel: HistoryPanel(state.history),
     settingsOpen: state.ui?.settingsOpen || false,
@@ -212,8 +214,13 @@ async function handleGenerateLesson() {
   }
 }
 
-async function handleSpeak(text, itemIndex) {
+async function handleSpeak(text, itemIndex, options = {}) {
+  const { onEnd, keepQueue = false } = options;
   try {
+    if (!keepQueue) {
+      isQueuePlaying = false;
+    }
+
     if (currentAudio) {
       try { currentAudio.pause(); } catch (e) {}
       currentAudio = null;
@@ -261,6 +268,7 @@ async function handleSpeak(text, itemIndex) {
         if (currentAudio === audio) {
           setStatus("待機中");
           currentAudio = null;
+          if (typeof onEnd === "function") onEnd();
         }
       };
       audio.addEventListener("ended", resetStatus);
@@ -274,12 +282,41 @@ async function handleSpeak(text, itemIndex) {
         speakingRate: targetSpeed,
         onEnd: () => {
           setStatus("待機中");
+          if (typeof onEnd === "function") onEnd();
         },
       });
     }
   } catch (error) {
     setStatus(asMessage(error));
+    if (typeof onEnd === "function") onEnd();
   }
+}
+
+async function handleSpeakAll() {
+  const items = state.lesson?.items || [];
+  if (items.length === 0) return;
+
+  isQueuePlaying = true;
+
+  for (let i = 0; i < items.length; i++) {
+    if (!isQueuePlaying) break;
+
+    state.activeLessonIndex = i;
+    render();
+
+    await new Promise((resolve) => {
+      handleSpeak(items[i].targetText, i, {
+        keepQueue: true,
+        onEnd: resolve,
+      });
+    });
+
+    if (isQueuePlaying && i < items.length - 1) {
+      await new Promise((resolve) => setTimeout(resolve, 600)); // 文間の少しの間隔
+    }
+  }
+
+  isQueuePlaying = false;
 }
 
 async function handleToggleRecord() {

@@ -16,8 +16,12 @@ export function CandidateList(items = [], activeIndex, handlers) {
         type: "button",
         onclick: (e) => {
           e.stopPropagation();
-          const allText = items.map((item) => item.targetText).join(". ");
-          handlers.onSpeak(allText);
+          if (handlers.onSpeakAll) {
+            handlers.onSpeakAll();
+          } else {
+            const allText = items.map((item) => item.targetText).join(". ");
+            handlers.onSpeak(allText);
+          }
         },
       }, [document.createRange().createContextualFragment(`${icon("volume-2")} すべて聞く`)])
         : document.createTextNode(""),

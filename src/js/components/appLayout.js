@@ -4,8 +4,7 @@ export function AppLayout({
   settingsPanel,
   lessonForm,
   lessonOutput,
-  recorderPanel,
-  evaluationPanel,
+  candidateList,
   historyPanel,
   settingsOpen,
   onOpenSettings,
@@ -27,8 +26,8 @@ export function AppLayout({
       ]),
     ]),
     el("div", { class: "practice-shell" }, [
-      el("section", { class: "main-stage" }, [lessonOutput, evaluationPanel]),
-      el("aside", { class: "side-panel" }, [lessonForm, recorderPanel, historyPanel]),
+      el("section", { class: "main-stage" }, [lessonOutput]),
+      el("aside", { class: "side-panel" }, [lessonForm, candidateList, historyPanel]),
     ]),
     settingsOpen ? el("div", { class: "modal-backdrop", onclick: onCloseSettings }, [
       el("div", { class: "settings-modal", onclick: (event) => event.stopPropagation() }, [

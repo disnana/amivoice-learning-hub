@@ -1,9 +1,10 @@
 import { loadHistory, loadSettings, saveHistory, saveSettings } from "./storage.js";
-
+ 
 export const state = {
   settings: loadSettings(),
   history: loadHistory(),
   lesson: null,
+  activeLessonIndex: 0, // 現在アクティブな問題のインデックス
   recording: {
     blob: null,
     mimeType: "",
@@ -15,12 +16,12 @@ export const state = {
     settingsOpen: false,
   },
 };
-
+ 
 export function updateSettings(nextSettings) {
   state.settings = { ...state.settings, ...nextSettings };
   saveSettings(state.settings);
 }
-
+ 
 export function pushHistory(entry) {
   state.history = [entry, ...state.history].slice(0, 20);
   saveHistory(state.history);

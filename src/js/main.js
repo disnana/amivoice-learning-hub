@@ -8,13 +8,12 @@ import {
 import { generateGeminiJson } from "./api/geminiClient.js";
 import { speakWithBrowser, synthesizeWithGoogleTts } from "./api/googleTtsClient.js";
 import { AppLayout } from "./components/appLayout.js";
-import { EvaluationPanel } from "./components/evaluationPanel.js";
+import { CandidateList } from "./components/candidateList.js";
 import { HistoryPanel } from "./components/historyPanel.js";
 import { LessonForm } from "./components/lessonForm.js";
 import { LessonOutput } from "./components/lessonOutput.js";
-import { RecorderPanel } from "./components/recorderPanel.js";
 import { SettingsPanel } from "./components/settingsPanel.js";
-import { toggleRecording } from "./controllers/recorderController.js";
+import { toggleRecording, isRecording } from "./controllers/recorderController.js";
 import { AMIVOICE_ENGINES } from "./data/models.js";
 import { buildEvaluationPrompt } from "./prompts/evaluationPrompt.js";
 import { buildLessonPrompt } from "./prompts/lessonPrompt.js";
@@ -23,6 +22,7 @@ import { asMessage } from "./utils/errors.js";
 import { setIconRoot } from "./utils/dom.js";
 
 const app = document.querySelector("#app");
+let recordingIndex = null; // 現在どのインデックスのカードが録音中か
 
 function readSettingsFromDom() {
   const hasSettingsModal = Boolean(document.querySelector("#geminiApiKey"));
@@ -86,6 +86,10 @@ function setStatus(message) {
 }
 
 function render() {
+  const activeItem = state.lesson?.items?.[state.activeLessonIndex] || null;
+  const isAnyRec = isRecording();
+  const isRecThis = isAnyRec && recordingIndex === state.activeLessonIndex;
+
   app.replaceChildren(AppLayout({
     settingsPanel: SettingsPanel(state.settings, {
       onSave: () => {
@@ -110,13 +114,22 @@ function render() {
         render();
       },
     }),
-    lessonOutput: LessonOutput(state.lesson, { onSpeak: handleSpeak }),
-    recorderPanel: RecorderPanel(state.recording, {
+    lessonOutput: LessonOutput(activeItem, {
+      onSpeak: handleSpeak,
       onToggleRecord: handleToggleRecord,
       onRecognize: handleRecognize,
       onEvaluate: handleEvaluate,
+    }, {
+      isAnyRecording: isAnyRec,
+      isRecordingThis: isRecThis,
     }),
-    evaluationPanel: EvaluationPanel(state.evaluation),
+    candidateList: CandidateList(state.lesson?.items, state.activeLessonIndex, {
+      onSelect: (index) => {
+        state.activeLessonIndex = index;
+        render();
+      },
+      onSpeak: handleSpeak,
+    }),
     historyPanel: HistoryPanel(state.history),
     settingsOpen: state.ui?.settingsOpen || false,
     onOpenSettings: () => {
@@ -140,13 +153,39 @@ async function handleGenerateLesson() {
     const sourceText = document.querySelector("#sourceText")?.value.trim();
     setStatus("Geminiで練習文を作成中...");
     const prompt = buildLessonPrompt({ ...state.settings, sourceText });
-    state.lesson = await generateGeminiJson({
+    const lessonData = await generateGeminiJson({
       apiKey: state.settings.geminiApiKey,
       model: state.settings.geminiModel,
       prompt,
     });
-    state.evaluation = null;
-    state.recording.transcript = "";
+
+    state.lesson = lessonData;
+    
+    // 各アイテムのステート初期化
+    if (state.lesson) {
+      if (!Array.isArray(state.lesson.items)) {
+        state.lesson.items = [{
+          targetText: state.lesson.targetText || "",
+          nativeMeaning: state.lesson.nativeMeaning || "",
+          readingGuide: state.lesson.readingGuide || "",
+          chunks: state.lesson.chunks || [],
+          pronunciationTips: state.lesson.pronunciationTips || [],
+          coachNote: state.lesson.coachNote || "",
+        }];
+      }
+      
+      state.lesson.items = state.lesson.items.map((item) => ({
+        ...item,
+        recording: { blob: null, mimeType: "", transcript: "" },
+        evaluation: null,
+        status: "idle",
+        error: "",
+        title: item.title || state.lesson.title || "Practice",
+      }));
+    }
+
+    state.activeLessonIndex = 0;
+    recordingIndex = null;
     setStatus("練習文を作成しました。");
     render();
   } catch (error) {
@@ -154,15 +193,16 @@ async function handleGenerateLesson() {
   }
 }
 
-async function handleSpeak() {
+async function handleSpeak(text) {
   try {
-    if (!state.lesson?.targetText) throw new Error("先に練習文を作ってください。");
+    const speakText = typeof text === "string" ? text : state.lesson?.items?.[state.activeLessonIndex]?.targetText;
+    if (!speakText) throw new Error("再生するテキストがありません。");
     updateSettings(readSettingsFromDom());
     if (state.settings.ttsProvider === "google") {
       setStatus("Google TTSで音声を作成中...");
       const url = await synthesizeWithGoogleTts({
         apiKey: state.settings.googleTtsApiKey,
-        text: state.lesson.targetText,
+        text: speakText,
         targetLanguage: state.settings.targetLanguage,
         voiceName: state.settings.ttsVoiceName,
         speakingRate: state.settings.ttsSpeakingRate,
@@ -171,7 +211,7 @@ async function handleSpeak() {
       new Audio(url).play();
     } else {
       speakWithBrowser({
-        text: state.lesson.targetText,
+        text: speakText,
         targetLanguage: state.settings.targetLanguage,
         speakingRate: state.settings.ttsSpeakingRate,
       });
@@ -183,79 +223,152 @@ async function handleSpeak() {
 }
 
 async function handleToggleRecord() {
+  const activeIdx = state.activeLessonIndex;
+  const item = state.lesson?.items?.[activeIdx];
+  if (!item) return;
+
   try {
+    const isAnyRec = isRecording();
+    if (isAnyRec && recordingIndex !== activeIdx) {
+      return; // 別のカードが録音中
+    }
+
     await toggleRecording({
       onStarted: () => {
+        recordingIndex = activeIdx;
         setStatus("録音中...");
-        const button = document.querySelector("#recordButton");
-        if (button) button.textContent = "録音停止";
+        render();
       },
       onStopped: (blob, mimeType) => {
-        state.recording.blob = blob;
-        state.recording.mimeType = mimeType;
-        state.recording.transcript = "";
+        if (state.lesson?.items?.[activeIdx]) {
+          state.lesson.items[activeIdx].recording = {
+            blob,
+            mimeType,
+            transcript: "",
+          };
+          state.lesson.items[activeIdx].status = "idle";
+          state.lesson.items[activeIdx].error = "";
+        }
+        recordingIndex = null;
         setStatus(`録音しました: ${mimeType}`);
         render();
       },
     });
   } catch (error) {
+    if (state.lesson?.items?.[activeIdx]) {
+      state.lesson.items[activeIdx].error = asMessage(error);
+    }
+    recordingIndex = null;
     setStatus(asMessage(error));
+    render();
   }
 }
 
 async function handleRecognize() {
+  const activeIdx = state.activeLessonIndex;
+  const item = state.lesson?.items?.[activeIdx];
+  if (!item || !item.recording?.blob) return;
+
   try {
     updateSettings(readSettingsFromDom());
+    item.status = "uploading";
+    item.error = "";
     setStatus("AmiVoiceへ送信中...");
+    render();
+
     const job = await createAmiVoiceJob({
       apiKey: state.settings.amivoiceApiKey,
-      audioBlob: state.recording.blob,
-      fileName: `practice.${state.recording.mimeType.includes("mp4") ? "mp4" : "webm"}`,
+      audioBlob: item.recording.blob,
+      fileName: `practice.${item.recording.mimeType.includes("mp4") ? "mp4" : "webm"}`,
       settings: state.settings,
     });
     const sessionId = getAmiVoiceSessionId(job);
     if (!sessionId) throw new Error(formatAmiVoiceCreateError(job));
+
+    if (state.lesson?.items?.[activeIdx]) {
+      state.lesson.items[activeIdx].status = "uploading";
+    }
     setStatus("AmiVoiceで認識中...");
+    render();
+
     const result = await pollAmiVoiceJob({
       apiKey: state.settings.amivoiceApiKey,
       sessionId,
       pollIntervalMs: state.settings.amivoicePollIntervalMs,
     });
-    state.recording.transcript = extractTranscript(result) || "認識テキストを抽出できませんでした。";
+
+    if (state.lesson?.items?.[activeIdx]) {
+      const targetItem = state.lesson.items[activeIdx];
+      targetItem.recording.transcript = extractTranscript(result) || "認識テキストを抽出できませんでした。";
+      targetItem.status = "idle";
+      targetItem.error = "";
+    }
     setStatus("認識が完了しました。");
     render();
   } catch (error) {
+    if (state.lesson?.items?.[activeIdx]) {
+      const targetItem = state.lesson.items[activeIdx];
+      targetItem.status = "idle";
+      targetItem.error = asMessage(error);
+    }
     setStatus(asMessage(error));
+    render();
   }
 }
 
 async function handleEvaluate() {
+  const activeIdx = state.activeLessonIndex;
+  const item = state.lesson?.items?.[activeIdx];
+  if (!item || !item.recording?.transcript) return;
+
   try {
-    if (!state.lesson) throw new Error("先に練習文を作ってください。");
-    if (!state.recording.transcript) throw new Error("先にAmiVoiceで認識してください。");
     updateSettings(readSettingsFromDom());
+    item.status = "evaluating";
+    item.error = "";
     setStatus("Geminiで発音を評価中...");
+    render();
+
     const prompt = buildEvaluationPrompt({
       nativeLanguage: state.settings.nativeLanguage,
       targetLanguage: state.settings.targetLanguage,
-      lesson: state.lesson,
-      transcript: state.recording.transcript,
+      lesson: {
+        title: item.title,
+        targetText: item.targetText,
+        nativeMeaning: item.nativeMeaning,
+      },
+      transcript: item.recording.transcript,
     });
-    state.evaluation = await generateGeminiJson({
+
+    const evaluationResult = await generateGeminiJson({
       apiKey: state.settings.geminiApiKey,
       model: state.settings.geminiModel,
       prompt,
     });
-    pushHistory({
-      title: state.lesson.title,
-      targetText: state.lesson.targetText,
-      score: state.evaluation.score,
-      createdAt: new Date().toISOString(),
-    });
+
+    if (state.lesson?.items?.[activeIdx]) {
+      const targetItem = state.lesson.items[activeIdx];
+      targetItem.evaluation = evaluationResult;
+      targetItem.status = "idle";
+      targetItem.error = "";
+
+      pushHistory({
+        title: targetItem.title,
+        targetText: targetItem.targetText,
+        score: targetItem.evaluation.score,
+        createdAt: new Date().toISOString(),
+      });
+    }
+
     setStatus("評価しました。");
     render();
   } catch (error) {
+    if (state.lesson?.items?.[activeIdx]) {
+      const targetItem = state.lesson.items[activeIdx];
+      targetItem.status = "idle";
+      targetItem.error = asMessage(error);
+    }
     setStatus(asMessage(error));
+    render();
   }
 }
 

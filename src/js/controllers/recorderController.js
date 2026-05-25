@@ -25,3 +25,7 @@ export async function toggleRecording({ onStarted, onStopped }) {
   recorder.start();
   onStarted();
 }
+
+export function isRecording() {
+  return recorder && recorder.state === "recording";
+}

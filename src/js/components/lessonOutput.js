@@ -9,7 +9,9 @@ function formatReadingGuide(text) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
   
-  return escaped.replace(/\*\*(.*?)\*\*/g, '<strong class="text-[var(--rose)] font-black border-b border-[var(--rose)]">$1</strong>');
+  return escaped
+    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-[var(--rose)] font-black border-b border-[var(--rose)]">$1</strong>')
+    .replace(/\r?\n/g, "<br>");
 }
 
 function list(items = []) {
@@ -88,7 +90,7 @@ export function LessonOutput(activeItem, handlers, { isAnyRecording, isRecording
       el("div", { class: "metric" }, [
         el("p", { class: "field-label", text: "読み方" }),
         el("p", { 
-          class: "mt-1 text-sm font-semibold tracking-wide", 
+          class: "mt-1 reading-guide text-sm font-semibold tracking-wide", 
           style: "font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;",
           html: formatReadingGuide(activeItem.readingGuide || "") 
         }),

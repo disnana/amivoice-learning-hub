@@ -231,6 +231,11 @@
   border-color: #cbd5e1;
 }
 
+.reading-guide {
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 520px) {
   .evaluation-head {
     grid-template-columns: 1fr;

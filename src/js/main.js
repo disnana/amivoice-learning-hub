@@ -25,28 +25,51 @@ import { setIconRoot } from "./utils/dom.js";
 const app = document.querySelector("#app");
 
 function readSettingsFromDom() {
+  const hasSettingsModal = Boolean(document.querySelector("#geminiApiKey"));
   const preset = document.querySelector("#amivoiceEnginePreset")?.value;
   const presetValue = AMIVOICE_ENGINES.find((engine) => engine.value === preset)?.value;
   const selectedGeminiModel = document.querySelector("#geminiModel")?.value || state.settings.geminiModel;
   const customGeminiModel = document.querySelector("#geminiModelCustom")?.value.trim();
+  const lessonCountMode = document.querySelector("#lessonCountMode")?.value || state.settings.lessonCountMode || "3";
+  const lessonCount = lessonCountMode === "custom"
+    ? Number(document.querySelector("#lessonCountCustom")?.value || state.settings.lessonCount || 3)
+    : Number(lessonCountMode);
   return {
     nativeLanguage: document.querySelector("#nativeLanguage")?.value || state.settings.nativeLanguage,
     targetLanguage: document.querySelector("#targetLanguage")?.value || state.settings.targetLanguage,
     useCase: document.querySelector("#useCase")?.value || state.settings.useCase,
-    geminiModel: selectedGeminiModel === "custom"
-      ? customGeminiModel || state.settings.geminiModel
-      : selectedGeminiModel,
-    geminiApiKey: document.querySelector("#geminiApiKey")?.value.trim() || "",
-    googleTtsApiKey: document.querySelector("#googleTtsApiKey")?.value.trim() || "",
-    ttsVoiceName: document.querySelector("#ttsVoiceName")?.value || "",
-    amivoiceApiKey: document.querySelector("#amivoiceApiKey")?.value.trim() || "",
-    amivoiceEngine: preset === "custom"
-      ? document.querySelector("#amivoiceEngine")?.value || "-a-general"
-      : presetValue || "-a-general",
-    amivoiceLoggingOptOut: Boolean(document.querySelector("#amivoiceLoggingOptOut")?.checked),
-    amivoiceUseRawParams: Boolean(document.querySelector("#amivoiceUseRawParams")?.checked),
-    amivoiceRawParams: document.querySelector("#amivoiceRawParams")?.value || "grammarFileNames=-a-general loggingOptOut=True",
-    amivoiceProfileWords: document.querySelector("#amivoiceProfileWords")?.value || "",
+    customUseCase: document.querySelector("#customUseCase")?.value || state.settings.customUseCase || "",
+    lessonCount: Math.min(20, Math.max(1, Number.isFinite(lessonCount) ? lessonCount : 3)),
+    lessonCountMode,
+    geminiModel: hasSettingsModal
+      ? (selectedGeminiModel === "custom" ? customGeminiModel || state.settings.geminiModel : selectedGeminiModel)
+      : state.settings.geminiModel,
+    geminiModelMode: hasSettingsModal
+      ? (selectedGeminiModel === "custom" ? "custom" : "preset")
+      : state.settings.geminiModelMode,
+    geminiApiKey: document.querySelector("#geminiApiKey")?.value.trim() || state.settings.geminiApiKey || "",
+    googleTtsApiKey: document.querySelector("#googleTtsApiKey")?.value.trim() || state.settings.googleTtsApiKey || "",
+    ttsVoiceName: document.querySelector("#ttsVoiceName")?.value || state.settings.ttsVoiceName || "",
+    amivoiceApiKey: document.querySelector("#amivoiceApiKey")?.value.trim() || state.settings.amivoiceApiKey || "",
+    amivoiceEngine: hasSettingsModal
+      ? (preset === "custom"
+        ? document.querySelector("#amivoiceEngine")?.value || state.settings.amivoiceEngine || "-a2b-multi-general"
+        : presetValue || "-a2b-multi-general")
+      : state.settings.amivoiceEngine,
+    amivoiceEngineMode: hasSettingsModal
+      ? (preset === "custom" ? "custom" : "preset")
+      : state.settings.amivoiceEngineMode,
+    amivoiceLoggingOptOut: document.querySelector("#amivoiceLoggingOptOut")
+      ? Boolean(document.querySelector("#amivoiceLoggingOptOut").checked)
+      : state.settings.amivoiceLoggingOptOut,
+    amivoiceUseRawParams: document.querySelector("#amivoiceUseRawParams")
+      ? Boolean(document.querySelector("#amivoiceUseRawParams").checked)
+      : state.settings.amivoiceUseRawParams,
+    amivoiceRawParams: document.querySelector("#amivoiceRawParams")?.value || state.settings.amivoiceRawParams || "grammarFileNames=-a2b-multi-general loggingOptOut=True",
+    amivoiceUseProfileWords: document.querySelector("#amivoiceUseProfileWords")
+      ? Boolean(document.querySelector("#amivoiceUseProfileWords").checked)
+      : state.settings.amivoiceUseProfileWords,
+    amivoiceProfileWords: document.querySelector("#amivoiceProfileWords")?.value || state.settings.amivoiceProfileWords || "",
   };
 }
 
@@ -68,6 +91,11 @@ function render() {
       onSave: () => {
         updateSettings(readSettingsFromDom());
         setStatus("設定を保存しました。");
+        state.ui.settingsOpen = false;
+        render();
+      },
+      onOptionChange: () => {
+        updateSettings(readSettingsFromDom());
         render();
       },
       onTtsProvider: (provider) => {
@@ -75,7 +103,13 @@ function render() {
         render();
       },
     }),
-    lessonForm: LessonForm(state.settings, { onGenerate: handleGenerateLesson }),
+    lessonForm: LessonForm(state.settings, {
+      onGenerate: handleGenerateLesson,
+      onOptionChange: () => {
+        updateSettings(readSettingsFromDom());
+        render();
+      },
+    }),
     lessonOutput: LessonOutput(state.lesson, { onSpeak: handleSpeak }),
     recorderPanel: RecorderPanel(state.recording, {
       onToggleRecord: handleToggleRecord,
@@ -84,6 +118,17 @@ function render() {
     }),
     evaluationPanel: EvaluationPanel(state.evaluation),
     historyPanel: HistoryPanel(state.history),
+    settingsOpen: state.ui?.settingsOpen || false,
+    onOpenSettings: () => {
+      state.ui ||= {};
+      state.ui.settingsOpen = true;
+      render();
+    },
+    onCloseSettings: () => {
+      state.ui ||= {};
+      state.ui.settingsOpen = false;
+      render();
+    },
   }));
   setStatus(state.status);
   setIconRoot(app);
@@ -93,7 +138,6 @@ async function handleGenerateLesson() {
   try {
     updateSettings(readSettingsFromDom());
     const sourceText = document.querySelector("#sourceText")?.value.trim();
-    if (!sourceText) throw new Error("練習したい内容を入力してください。");
     setStatus("Geminiで練習文を作成中...");
     const prompt = buildLessonPrompt({ ...state.settings, sourceText });
     state.lesson = await generateGeminiJson({
@@ -215,4 +259,9 @@ async function handleEvaluate() {
   }
 }
 
-render();
+try {
+  render();
+} catch (error) {
+  app.textContent = asMessage(error);
+  console.error(error);
+}

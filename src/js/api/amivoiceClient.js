@@ -10,7 +10,7 @@ function buildParameters(settings) {
     `grammarFileNames=${settings.amivoiceEngine || "-a-general"}`,
     `loggingOptOut=${settings.amivoiceLoggingOptOut ? "True" : "False"}`,
   ];
-  if (settings.amivoiceProfileWords.trim()) {
+  if (settings.amivoiceUseProfileWords && settings.amivoiceProfileWords.trim()) {
     parts.push(`profileWords=${encodeURIComponent(settings.amivoiceProfileWords.trim())}`);
   }
   return parts.join(" ");

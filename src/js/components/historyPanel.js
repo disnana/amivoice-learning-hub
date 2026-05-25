@@ -1,10 +1,10 @@
 import { el } from "../utils/dom.js";
 
 export function HistoryPanel(history) {
-  return el("section", { class: "panel p-4 space-y-3" }, [
+  return el("section", { class: "panel history-compact p-3 space-y-2" }, [
     el("div", {}, [
       el("p", { class: "text-xs font-black uppercase tracking-wide text-[var(--green)]", text: "History" }),
-      el("h2", { class: "text-xl font-black", text: "履歴" }),
+      el("h2", { class: "text-base font-black", text: "履歴" }),
     ]),
     history.length
       ? el("div", { class: "grid gap-2" }, history.map((item) => el("div", { class: "panel-muted p-3" }, [

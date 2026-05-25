@@ -11,6 +11,9 @@ export const state = {
   },
   evaluation: null,
   status: "準備OK",
+  ui: {
+    settingsOpen: false,
+  },
 };
 
 export function updateSettings(nextSettings) {

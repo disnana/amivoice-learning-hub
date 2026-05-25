@@ -1,54 +1,94 @@
 .field {
   display: grid;
-  gap: 7px;
+  gap: 6px;
 }
 
 .field-label {
   color: var(--muted);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .input,
 .select,
 .textarea {
   width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #fff;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.95);
   color: var(--ink);
-  padding: 10px 12px;
+  min-height: 42px;
+  padding: 10px 14px;
+  font-size: 14px;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.02);
+  transition: var(--transition-smooth);
+}
+
+.select {
+  cursor: pointer;
 }
 
 .textarea {
-  min-height: 124px;
+  min-height: 96px;
   resize: vertical;
+}
+
+.input:hover,
+.select:hover,
+.textarea:hover {
+  border-color: #cbd5e1;
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: var(--green);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.12), inset 0 1px 2px rgba(15, 23, 42, 0.02);
 }
 
 .input::placeholder,
 .textarea::placeholder {
-  color: #97a49d;
+  color: #94a3b8;
 }
 
+/* セグメンテッドコントロール (内蔵 / Google TTS 切り替え用) */
 .segmented {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  border-radius: 8px;
-  background: #edf4ef;
-  padding: 5px;
+  gap: 4px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  padding: 4px;
+  border: 1px solid rgba(226, 232, 240, 0.8);
 }
 
 .segment {
   min-height: 36px;
-  border-radius: 7px;
+  border-radius: 8px;
   color: var(--muted);
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 700;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: var(--transition-smooth);
+}
+
+.segment:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .segment.is-active {
-  background: #fff;
+  background: #ffffff;
   color: var(--ink);
-  box-shadow: 0 1px 8px rgba(23, 33, 28, 0.08);
+  box-shadow: var(--shadow-sm), 0 2px 4px rgba(15, 23, 42, 0.04);
+}
+
+.segment.is-active:hover {
+  background: #ffffff;
 }

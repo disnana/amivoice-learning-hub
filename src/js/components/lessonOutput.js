@@ -6,8 +6,13 @@ function list(items = []) {
 
 export function LessonOutput(lesson, handlers) {
   if (!lesson) {
-    return el("section", { class: "panel p-5 text-sm text-[var(--muted)]" }, [
-      el("p", { text: "練習文を生成すると、ここに読み方・区切り・発音ポイントが出ます。" }),
+    return el("section", { class: "panel lesson-empty" }, [
+      el("p", { class: "text-xs font-black uppercase tracking-wide text-[var(--green)]", text: "Lesson" }),
+      el("h2", { class: "lesson-empty-title", text: "練習文はまだありません" }),
+      el("p", {
+        class: "lesson-empty-copy",
+        text: "条件を選んで生成すると、文章・読み方・区切り・発音ポイントがここにまとまります。",
+      }),
     ]);
   }
 
@@ -42,5 +47,13 @@ export function LessonOutput(lesson, handlers) {
       el("p", { class: "font-bold", text: "方針" }),
       el("p", { class: "mt-1", text: lesson.coachNote || "" }),
     ]),
+    Array.isArray(lesson.items) && lesson.items.length > 1 ? el("div", {}, [
+      el("p", { class: "field-label mb-2", text: "作成された候補" }),
+      el("div", { class: "lesson-candidates" }, lesson.items.map((item, index) => el("article", { class: "candidate-card" }, [
+        el("span", { class: "status-pill", text: String(index + 1) }),
+        el("strong", { text: item.targetText || "" }),
+        el("p", { class: "text-sm text-[var(--muted)]", text: item.nativeMeaning || "" }),
+      ]))),
+    ]) : document.createTextNode(""),
   ]);
 }

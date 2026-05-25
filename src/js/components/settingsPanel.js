@@ -5,15 +5,14 @@ import { checkboxField, inputField, selectField, textareaField } from "./field.j
 
 export function SettingsPanel(settings, handlers) {
   const provider = settings.ttsProvider;
-  const selectedGeminiModel = GEMINI_MODELS.includes(settings.geminiModel) ? settings.geminiModel : "custom";
-  return el("aside", { class: "panel p-4 space-y-4" }, [
-    el("div", { class: "flex items-start justify-between gap-3" }, [
-      el("div", {}, [
-        el("p", { class: "text-xs font-black uppercase tracking-wide text-[var(--green)]", text: "Setup" }),
-        el("h1", { class: "text-2xl font-black", text: "PhrasePilot" }),
-      ]),
-      el("span", { class: "status-pill" }, [document.createRange().createContextualFragment(`${icon("key-round")} BYO API`)]),
-    ]),
+  const selectedGeminiModel = settings.geminiModelMode === "custom" || !GEMINI_MODELS.includes(settings.geminiModel)
+    ? "custom"
+    : settings.geminiModel;
+  const selectedAmiVoiceEngine = settings.amivoiceEngineMode === "custom" || !AMIVOICE_ENGINES.some((engine) => engine.value === settings.amivoiceEngine)
+    ? "custom"
+    : settings.amivoiceEngine;
+  return el("aside", { class: "settings-form" }, [
+    el("span", { class: "status-pill settings-badge" }, [document.createRange().createContextualFragment(`${icon("key-round")} BYO API`)]),
     selectField({
       id: "nativeLanguage",
       label: "母国語",
@@ -29,12 +28,12 @@ export function SettingsPanel(settings, handlers) {
         { value: "custom", label: "カスタム" },
       ],
     }),
-    inputField({
+    selectedGeminiModel === "custom" ? inputField({
       id: "geminiModelCustom",
       label: "Geminiモデル カスタム",
-      value: selectedGeminiModel === "custom" ? settings.geminiModel : "",
+      value: settings.geminiModel,
       placeholder: "例: gemini-flash-latest",
-    }),
+    }) : document.createTextNode(""),
     inputField({
       id: "geminiApiKey",
       label: "Gemini APIキー",
@@ -56,19 +55,19 @@ export function SettingsPanel(settings, handlers) {
         text: "Google TTS",
       }),
     ]),
-    inputField({
+    provider === "google" ? inputField({
       id: "googleTtsApiKey",
       label: "Google TTS APIキー",
       value: settings.googleTtsApiKey,
       type: "password",
       placeholder: "ブラウザ直叩きが通る場合に使用",
-    }),
-    inputField({
+    }) : document.createTextNode(""),
+    provider === "google" ? inputField({
       id: "ttsVoiceName",
       label: "Google TTS voice name",
       value: settings.ttsVoiceName,
       placeholder: "空なら言語ごとの既定音声",
-    }),
+    }) : document.createTextNode(""),
     inputField({
       id: "amivoiceApiKey",
       label: "AmiVoice APIキー authorization",
@@ -79,47 +78,65 @@ export function SettingsPanel(settings, handlers) {
     selectField({
       id: "amivoiceEnginePreset",
       label: "AmiVoiceエンジン",
-      value: AMIVOICE_ENGINES.some((engine) => engine.value === settings.amivoiceEngine)
-        ? settings.amivoiceEngine
-        : "custom",
+      value: selectedAmiVoiceEngine,
       options: AMIVOICE_ENGINES,
     }),
-    inputField({
+    selectedAmiVoiceEngine === "custom" ? inputField({
       id: "amivoiceEngine",
       label: "AmiVoice engine value",
       value: settings.amivoiceEngine,
       placeholder: "-a-general",
-    }),
-    checkboxField({
-      id: "amivoiceLoggingOptOut",
-      label: "AmiVoiceのログ保存をオプトアウトする",
-      checked: settings.amivoiceLoggingOptOut,
-      help: "オンなら loggingOptOut=True。オフなら料金が安くなる場合があります。",
-    }),
-    checkboxField({
-      id: "amivoiceUseRawParams",
-      label: "AmiVoice dパラメータを直接指定する",
-      checked: settings.amivoiceUseRawParams,
-      help: "オンなら下の文字列をそのまま送ります。",
-    }),
-    textareaField({
-      id: "amivoiceRawParams",
-      label: "AmiVoice dパラメータ",
-      value: settings.amivoiceRawParams,
-      placeholder: "grammarFileNames=-a-general loggingOptOut=True",
-      rows: 3,
-    }),
-    textareaField({
-      id: "amivoiceProfileWords",
-      label: "ユーザー辞書メモ",
-      value: settings.amivoiceProfileWords,
-      placeholder: "Alpha alfa\nBravo bravo\nrunway runway",
-      rows: 4,
-    }),
-    el("button", {
-      class: "button button-primary w-full",
-      type: "button",
-      onclick: handlers.onSave,
-    }, [document.createRange().createContextualFragment(`${icon("save")} 保存`)]),
-  ]);
+    }) : document.createTextNode(""),
+    el("details", { class: "settings-advanced settings-wide" }, [
+      el("summary", { text: "AmiVoice詳細" }),
+      el("div", { class: "settings-advanced-grid" }, [
+        checkboxField({
+          id: "amivoiceLoggingOptOut",
+          label: "ログ保存をオプトアウト",
+          checked: settings.amivoiceLoggingOptOut,
+          help: "オンなら loggingOptOut=True。",
+        }),
+        checkboxField({
+          id: "amivoiceUseRawParams",
+          label: "dパラメータ直接指定",
+          checked: settings.amivoiceUseRawParams,
+          help: "オンなら下の文字列をそのまま送ります。",
+        }),
+        settings.amivoiceUseRawParams ? textareaField({
+          id: "amivoiceRawParams",
+          label: "AmiVoice dパラメータ",
+          value: settings.amivoiceRawParams,
+          placeholder: "grammarFileNames=-a2b-multi-general loggingOptOut=True",
+          rows: 2,
+        }) : document.createTextNode(""),
+        checkboxField({
+          id: "amivoiceUseProfileWords",
+          label: "ユーザー辞書を使う",
+          checked: settings.amivoiceUseProfileWords,
+          help: "オンなら profileWords を送ります。",
+        }),
+        settings.amivoiceUseProfileWords ? textareaField({
+          id: "amivoiceProfileWords",
+          label: "AmiVoice profileWords",
+          value: settings.amivoiceProfileWords,
+          placeholder: "Alpha alfa\nBravo bravo\nrunway runway",
+          rows: 2,
+        }) : document.createTextNode(""),
+      ]),
+    ]),
+    el("div", { class: "settings-actions settings-wide" }, [
+      el("button", {
+        class: "button button-primary",
+        type: "button",
+        onclick: handlers.onSave,
+      }, [document.createRange().createContextualFragment(`${icon("save")} 保存`)]),
+    ]),
+  ].map((node) => {
+    if (node.nodeType === Node.TEXT_NODE) return node;
+    if (node.querySelector?.("#geminiModel")) node.querySelector("#geminiModel").addEventListener("change", handlers.onOptionChange);
+    if (node.querySelector?.("#amivoiceEnginePreset")) node.querySelector("#amivoiceEnginePreset").addEventListener("change", handlers.onOptionChange);
+    if (node.querySelector?.("#amivoiceUseRawParams")) node.querySelector("#amivoiceUseRawParams").addEventListener("change", handlers.onOptionChange);
+    if (node.querySelector?.("#amivoiceUseProfileWords")) node.querySelector("#amivoiceUseProfileWords").addEventListener("change", handlers.onOptionChange);
+    return node;
+  }));
 }

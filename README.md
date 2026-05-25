@@ -22,8 +22,8 @@ http://127.0.0.1:5173
 - Google TTSは `v1/text:synthesize` をAPIキー付きで試します
 - Google TTSがブラウザ直呼びで通らない場合は、内蔵TTSを使います
 - AmiVoiceは非同期HTTP API v2のバッチ認識を使います
-- AmiVoiceの初期エンジンは `-a-general`
-- AmiVoice送信パラメータの初期値は `grammarFileNames=-a-general loggingOptOut=True`
+- AmiVoiceの初期エンジンは `多言語E2E_汎用バッチ`、接続エンジン名は `-a2b-multi-general`
+- AmiVoice送信パラメータの初期値は `grammarFileNames=-a2b-multi-general loggingOptOut=True`
 - AmiVoiceの `loggingOptOut` は画面で切り替え可能
 - AmiVoiceの `d` パラメータは、フォーム生成または直接指定を選択可能
 

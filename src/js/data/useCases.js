@@ -5,6 +5,7 @@ export const USE_CASES = [
   { id: "presentation", label: "発表", tone: "聞き取りやすく論理的な表現" },
   { id: "aviation", label: "航空無線", tone: "短く、定型的で、曖昧さの少ない交信表現" },
   { id: "free", label: "自由", tone: "ユーザーの目的に合わせた表現" },
+  { id: "custom", label: "カスタム", tone: "ユーザーが入力した用途に合わせた表現" },
 ];
 
 export function findUseCase(id) {

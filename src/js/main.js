@@ -20,6 +20,7 @@ import { buildLessonPrompt } from "./prompts/lessonPrompt.js";
 import { pushHistory, state, updateSettings } from "./state/appState.js";
 import { asMessage } from "./utils/errors.js";
 import { setIconRoot } from "./utils/dom.js";
+import { normalizeSpeechText } from "./utils/speechText.js";
 
 const app = document.querySelector("#app");
 let recordingIndex = null; // 現在どのインデックスのカードが録音中か
@@ -229,7 +230,7 @@ async function handleSpeak(text, itemIndex, options = {}) {
 
     const activeIdx = typeof itemIndex === "number" ? itemIndex : state.activeLessonIndex;
     const item = state.lesson?.items?.[activeIdx];
-    const speakText = typeof text === "string" ? text : item?.targetText;
+    const speakText = normalizeSpeechText(typeof text === "string" ? text : item?.targetText);
     if (!speakText) throw new Error("再生するテキストがありません。");
     updateSettings(readSettingsFromDom());
 

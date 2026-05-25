@@ -20,6 +20,13 @@ ${effectiveSourceText}
 ユーザーの入力が「指定なし」の場合は、用途と言語に合った短い練習文をあなたが提案してください。
 練習文は合計${lessonCount || 3}個作成し、そのすべて（1つ目の候補も含む）を items 配列に入れてください。また、items配列の最初の要素と同じ内容を、親オブジェクトの targetText, nativeMeaning, readingGuide, chunks, pronunciationTips にも設定してください。
 
+targetTextのルール:
+- targetTextはTTSで自然に読み上げる本文です。
+- targetTextには "/"、発音補助記号、カタカナ、括弧内の発音説明を絶対に入れないでください。
+- targetTextには readingGuide の内容を混ぜないでください。
+- 区切り記号 "/" は readingGuide と chunks のみに使ってください。
+- 例: targetText は "I'm just heading out."。 "I'm / just / heading / out" は禁止です。
+
 読み方ガイドの品質ルール:
 - readingGuideを雑なカタカナ1行だけで済ませないでください。
 - readingGuideは「原文の区切り」「発音補助」「注意」を含む1つの文字列にしてください。

@@ -70,7 +70,7 @@ export function CandidateList(items = [], activeIndex, handlers) {
             title: "この文を聞く",
             onclick: (e) => {
               e.stopPropagation();
-              handlers.onSpeak(item.targetText);
+              handlers.onSpeak(item.targetText, index);
             },
           }, [document.createRange().createContextualFragment(icon("volume-2"))]),
         ]),

@@ -181,12 +181,6 @@
   list-style: none;
 }
 
-/* 履歴パネル */
-.history-compact {
-  max-height: 400px;
-  overflow-y: auto;
-  background: rgba(255, 255, 255, 0.65);
-}
 
 /* 空状態のプレースホルダー */
 .lesson-empty {

@@ -62,12 +62,35 @@ export function SettingsPanel(settings, handlers) {
       type: "password",
       placeholder: "ブラウザ直叩きが通る場合に使用",
     }) : document.createTextNode(""),
-    provider === "google" ? inputField({
-      id: "ttsVoiceName",
-      label: "Google TTS voice name",
-      value: settings.ttsVoiceName,
-      placeholder: "空なら言語ごとの既定音声",
+    provider === "google" ? selectField({
+      id: "googleTtsModelType",
+      label: "音声モデル (料金クラス)",
+      value: settings.googleTtsModelType || "default",
+      options: [
+        { value: "default", label: "デフォルト (言語の既定値)" },
+        { value: "Standard", label: "標準音声 (Standard - 月400万字無料)" },
+        { value: "Wavenet", label: "WaveNet (WaveNet - 月400万字無料)" },
+        { value: "Neural2", label: "Neural2 (Neural2 - 月100万字無料)" },
+        { value: "Chirp", label: "Chirp 3: HD (Chirp - 月100万字無料)" },
+        { value: "Studio", label: "スタジオ音声 (Studio - 月100万字無料)" },
+        { value: "custom", label: "カスタム (直接ボイス名指定)" },
+      ],
     }) : document.createTextNode(""),
+    provider === "google" && settings.googleTtsModelType === "custom" ? inputField({
+      id: "ttsVoiceName",
+      label: "Google TTS voice name (直接指定)",
+      value: settings.ttsVoiceName || "",
+      placeholder: "例: ja-JP-Neural2-B",
+    }) : document.createTextNode(""),
+    provider === "google" ? el("div", { class: "panel-muted text-[10px] space-y-1 p-2 rounded border border-slate-100" }, [
+      el("p", { class: "font-bold text-slate-600 dark:text-slate-300", text: "💡 Google Cloud TTS 料金と無料枠/月" }),
+      el("div", { class: "grid grid-cols-2 gap-x-2 text-slate-500" }, [
+        el("span", { text: "標準 / WaveNet:" }), el("span", { class: "text-right font-semibold", text: "400万字無料 (超過 $4/M)" }),
+        el("span", { text: "Neural2:" }), el("span", { class: "text-right font-semibold", text: "100万字無料 (超過 $16/M)" }),
+        el("span", { text: "Chirp (HD):" }), el("span", { class: "text-right font-semibold", text: "100万字無料 (超過 $30/M)" }),
+        el("span", { text: "Studio (高品質):" }), el("span", { class: "text-right font-semibold", text: "100万字無料 (超過 $160/M)" }),
+      ])
+    ]) : document.createTextNode(""),
     inputField({
       id: "amivoiceApiKey",
       label: "AmiVoice APIキー authorization",

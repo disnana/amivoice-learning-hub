@@ -23,6 +23,7 @@ import { setIconRoot } from "./utils/dom.js";
 
 const app = document.querySelector("#app");
 let recordingIndex = null; // 現在どのインデックスのカードが録音中か
+let currentAudio = null; // 現在再生中のオーディオオブジェクト (Google TTS用)
 
 function readSettingsFromDom() {
   const hasSettingsModal = Boolean(document.querySelector("#geminiApiKey"));
@@ -49,6 +50,7 @@ function readSettingsFromDom() {
       : state.settings.geminiModelMode,
     geminiApiKey: document.querySelector("#geminiApiKey")?.value.trim() || state.settings.geminiApiKey || "",
     googleTtsApiKey: document.querySelector("#googleTtsApiKey")?.value.trim() || state.settings.googleTtsApiKey || "",
+    googleTtsModelType: document.querySelector("#googleTtsModelType")?.value || state.settings.googleTtsModelType || "default",
     ttsVoiceName: document.querySelector("#ttsVoiceName")?.value || state.settings.ttsVoiceName || "",
     amivoiceApiKey: document.querySelector("#amivoiceApiKey")?.value.trim() || state.settings.amivoiceApiKey || "",
     amivoiceEngine: hasSettingsModal
@@ -86,6 +88,10 @@ function setStatus(message) {
 }
 
 function render() {
+  // 再描画前にフォームの入力値を state に退避（DOM置換で消えるのを防ぐ）
+  const currentSourceText = document.querySelector("#sourceText");
+  if (currentSourceText) state.sourceText = currentSourceText.value;
+
   const activeItem = state.lesson?.items?.[state.activeLessonIndex] || null;
   const isAnyRec = isRecording();
   const isRecThis = isAnyRec && recordingIndex === state.activeLessonIndex;
@@ -115,20 +121,27 @@ function render() {
       },
     }),
     lessonOutput: LessonOutput(activeItem, {
-      onSpeak: handleSpeak,
+      onSpeak: (text) => handleSpeak(text, state.activeLessonIndex),
       onToggleRecord: handleToggleRecord,
       onRecognize: handleRecognize,
       onEvaluate: handleEvaluate,
+      onSpeedChange: (speed) => {
+        state.settings.ttsSpeakingRate = speed;
+        const slider = document.querySelector("#ttsSpeakingRate");
+        if (slider) slider.value = speed;
+        render();
+      },
     }, {
       isAnyRecording: isAnyRec,
       isRecordingThis: isRecThis,
+      ttsSpeakingRate: state.settings.ttsSpeakingRate,
     }),
     candidateList: CandidateList(state.lesson?.items, state.activeLessonIndex, {
       onSelect: (index) => {
         state.activeLessonIndex = index;
         render();
       },
-      onSpeak: handleSpeak,
+      onSpeak: (text, index) => handleSpeak(text, index),
     }),
     historyPanel: HistoryPanel(state.history),
     settingsOpen: state.ui?.settingsOpen || false,
@@ -145,14 +158,19 @@ function render() {
   }));
   setStatus(state.status);
   setIconRoot(app);
+  // DOM置換後にフォームの入力値を復元
+  const restoredSourceText = document.querySelector("#sourceText");
+  if (restoredSourceText && state.sourceText) restoredSourceText.value = state.sourceText;
 }
 
 async function handleGenerateLesson() {
   try {
+    // 生成前に最新の入力値を取得・保存
+    const sourceTextEl = document.querySelector("#sourceText");
+    if (sourceTextEl) state.sourceText = sourceTextEl.value;
     updateSettings(readSettingsFromDom());
-    const sourceText = document.querySelector("#sourceText")?.value.trim();
     setStatus("Geminiで練習文を作成中...");
-    const prompt = buildLessonPrompt({ ...state.settings, sourceText });
+    const prompt = buildLessonPrompt({ ...state.settings, sourceText: state.sourceText.trim() });
     const lessonData = await generateGeminiJson({
       apiKey: state.settings.geminiApiKey,
       model: state.settings.geminiModel,
@@ -180,6 +198,7 @@ async function handleGenerateLesson() {
         evaluation: null,
         status: "idle",
         error: "",
+        ttsAudioUrl: null,
         title: item.title || state.lesson.title || "Practice",
       }));
     }
@@ -193,30 +212,71 @@ async function handleGenerateLesson() {
   }
 }
 
-async function handleSpeak(text) {
+async function handleSpeak(text, itemIndex) {
   try {
-    const speakText = typeof text === "string" ? text : state.lesson?.items?.[state.activeLessonIndex]?.targetText;
+    if (currentAudio) {
+      try { currentAudio.pause(); } catch (e) {}
+      currentAudio = null;
+    }
+    window.speechSynthesis.cancel();
+
+    const activeIdx = typeof itemIndex === "number" ? itemIndex : state.activeLessonIndex;
+    const item = state.lesson?.items?.[activeIdx];
+    const speakText = typeof text === "string" ? text : item?.targetText;
     if (!speakText) throw new Error("再生するテキストがありません。");
     updateSettings(readSettingsFromDom());
+
+    const targetSpeed = Number(state.settings.ttsSpeakingRate) || 1.0;
+
     if (state.settings.ttsProvider === "google") {
-      setStatus("Google TTSで音声を作成中...");
-      const url = await synthesizeWithGoogleTts({
-        apiKey: state.settings.googleTtsApiKey,
-        text: speakText,
-        targetLanguage: state.settings.targetLanguage,
-        voiceName: state.settings.ttsVoiceName,
-        speakingRate: state.settings.ttsSpeakingRate,
-        pitch: state.settings.ttsPitch,
-      });
-      new Audio(url).play();
+      const isTargetTextMatch = item && item.targetText === speakText;
+      let url = isTargetTextMatch ? item.ttsAudioUrl : null;
+
+      if (isTargetTextMatch && url) {
+        setStatus("再生しています (キャッシュ)...");
+      } else {
+        setStatus("Google TTSで音声を作成中...");
+        // 費用節約とキャッシュの汎用性のため、API側は常に 1.0 (等倍) でリクエストして生成する
+        url = await synthesizeWithGoogleTts({
+          apiKey: state.settings.googleTtsApiKey,
+          text: speakText,
+          targetLanguage: state.settings.targetLanguage,
+          googleTtsModelType: state.settings.googleTtsModelType,
+          voiceName: state.settings.ttsVoiceName,
+          speakingRate: 1.0, // 常に 1.0 固定
+          pitch: state.settings.ttsPitch,
+        });
+
+        if (isTargetTextMatch) {
+          item.ttsAudioUrl = url;
+        }
+        setStatus("再生しています...");
+      }
+
+      const audio = new Audio(url);
+      audio.playbackRate = targetSpeed;
+      currentAudio = audio;
+
+      const resetStatus = () => {
+        if (currentAudio === audio) {
+          setStatus("待機中");
+          currentAudio = null;
+        }
+      };
+      audio.addEventListener("ended", resetStatus);
+      audio.addEventListener("error", resetStatus);
+      audio.play();
     } else {
+      setStatus("再生しています...");
       speakWithBrowser({
         text: speakText,
         targetLanguage: state.settings.targetLanguage,
-        speakingRate: state.settings.ttsSpeakingRate,
+        speakingRate: targetSpeed,
+        onEnd: () => {
+          setStatus("待機中");
+        },
       });
     }
-    setStatus("再生しています。");
   } catch (error) {
     setStatus(asMessage(error));
   }

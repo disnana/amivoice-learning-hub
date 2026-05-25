@@ -4,7 +4,8 @@ export const state = {
   settings: loadSettings(),
   history: loadHistory(),
   lesson: null,
-  activeLessonIndex: 0, // 現在アクティブな問題のインデックス
+  activeLessonIndex: 0,
+  sourceText: "", // フォームの入力値を保持
   recording: {
     blob: null,
     mimeType: "",

@@ -1,5 +1,17 @@
 import { el, icon } from "../utils/dom.js";
 
+function formatReadingGuide(text) {
+  if (!text) return "";
+  const escaped = text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+  
+  return escaped.replace(/\*\*(.*?)\*\*/g, '<strong class="text-[var(--rose)] font-black border-b border-[var(--rose)]">$1</strong>');
+}
+
 function list(items = []) {
   return el("ul", { class: "grid gap-2" }, items.map((item) => el("li", { class: "feedback-item", text: item })));
 }
@@ -11,7 +23,7 @@ function feedbackBlock(title, items = []) {
   ]);
 }
 
-export function LessonOutput(activeItem, handlers, { isAnyRecording, isRecordingThis } = {}) {
+export function LessonOutput(activeItem, handlers, { isAnyRecording, isRecordingThis, ttsSpeakingRate } = {}) {
   if (!activeItem) {
     return el("section", { class: "panel lesson-empty" }, [
       el("p", { class: "text-xs font-black uppercase tracking-wide text-[var(--green)]", text: "Lesson" }),
@@ -45,11 +57,26 @@ export function LessonOutput(activeItem, handlers, { isAnyRecording, isRecording
         el("p", { class: "text-xs font-black uppercase tracking-wide text-[var(--green)]", text: activeItem.title || "Practice" }),
         el("h2", { class: "text-2xl font-black leading-tight text-[var(--ink)]", text: activeItem.targetText }),
       ]),
-      el("button", {
-        class: "button button-secondary",
-        type: "button",
-        onclick: () => handlers.onSpeak(activeItem.targetText),
-      }, [document.createRange().createContextualFragment(`${icon("volume-2")} 聞く`)]),
+      el("div", { class: "flex items-center gap-2" }, [
+        el("span", { class: "text-xs text-[var(--muted)] font-bold", text: "速度:" }),
+        el("select", {
+          class: "select py-1 px-2 text-xs min-h-0 bg-white border border-slate-200 rounded cursor-pointer",
+          style: "width: auto; padding-right: 1.5rem;",
+          onchange: (e) => {
+            if (handlers.onSpeedChange) handlers.onSpeedChange(Number(e.target.value));
+          }
+        }, [
+          el("option", { value: "0.6", selected: ttsSpeakingRate === 0.6 ? "selected" : null }, [document.createTextNode("0.6x (遅い)")]),
+          el("option", { value: "0.8", selected: ttsSpeakingRate === 0.8 || ttsSpeakingRate === 0.86 ? "selected" : null }, [document.createTextNode("0.8x")]),
+          el("option", { value: "1.0", selected: ttsSpeakingRate === 1.0 ? "selected" : null }, [document.createTextNode("1.0x (標準)")]),
+          el("option", { value: "1.3", selected: ttsSpeakingRate === 1.3 ? "selected" : null }, [document.createTextNode("1.3x")]),
+        ]),
+        el("button", {
+          class: "button button-secondary",
+          type: "button",
+          onclick: () => handlers.onSpeak(activeItem.targetText),
+        }, [document.createRange().createContextualFragment(`${icon("volume-2")} 聞く`)]),
+      ]),
     ]),
 
     /* 2. 基本情報 (意味・読み方) */
@@ -60,7 +87,11 @@ export function LessonOutput(activeItem, handlers, { isAnyRecording, isRecording
       ]),
       el("div", { class: "metric" }, [
         el("p", { class: "field-label", text: "読み方" }),
-        el("p", { class: "mt-1 text-sm font-semibold", text: activeItem.readingGuide || "" }),
+        el("p", { 
+          class: "mt-1 text-sm font-semibold tracking-wide", 
+          style: "font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;",
+          html: formatReadingGuide(activeItem.readingGuide || "") 
+        }),
       ]),
     ]),
 

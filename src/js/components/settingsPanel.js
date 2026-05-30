@@ -117,6 +117,7 @@ export function SettingsPanel(settings, handlers) {
     placeholder: "-a-general",
   });
   amivoiceEngineField.id = "amivoiceEngine-wrapper";
+  amivoiceEngineField.classList.add("settings-wide");
   if (selectedAmiVoiceEngine !== "custom") amivoiceEngineField.classList.add("hidden");
 
   const amivoiceLoggingOptOutField = checkboxField({
@@ -141,6 +142,7 @@ export function SettingsPanel(settings, handlers) {
     rows: 2,
   });
   amivoiceRawParamsField.id = "amivoiceRawParams-wrapper";
+  amivoiceRawParamsField.classList.add("settings-wide");
   if (!settings.amivoiceUseRawParams) amivoiceRawParamsField.classList.add("hidden");
 
   const amivoiceUseProfileWordsField = checkboxField({
@@ -158,6 +160,7 @@ export function SettingsPanel(settings, handlers) {
     rows: 2,
   });
   amivoiceProfileWordsField.id = "amivoiceProfileWords-wrapper";
+  amivoiceProfileWordsField.classList.add("settings-wide");
   if (!settings.amivoiceUseProfileWords) amivoiceProfileWordsField.classList.add("hidden");
 
   // 2. DOMの構築

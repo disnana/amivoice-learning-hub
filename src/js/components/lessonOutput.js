@@ -25,7 +25,7 @@ function feedbackBlock(title, items = []) {
   ]);
 }
 
-export function LessonOutput(activeItem, handlers, { isAnyRecording, isRecordingThis, ttsSpeakingRate } = {}) {
+export function LessonOutput(activeItem, handlers, { isAnyRecording, isRecordingThis, ttsSpeakingRate, speechRecProvider, amivoiceApiKey } = {}) {
   if (!activeItem) {
     return el("section", { class: "panel lesson-empty" }, [
       el("p", { class: "text-xs font-black uppercase tracking-wide text-[var(--green)]", text: "Lesson" }),
@@ -135,11 +135,19 @@ export function LessonOutput(activeItem, handlers, { isAnyRecording, isRecording
           disabled: recordDisabled,
         }, [document.createRange().createContextualFragment(`${icon("mic")} ${recordButtonText}`)]),
         el("button", {
-          class: "button button-secondary",
+          class: speechRecProvider === "browser" && recording.transcript && !recording.isAmiVoice
+            ? "button button-secondary text-[var(--blue)] font-black border border-[var(--blue)] hover:bg-slate-100/80 transition-all"
+            : "button button-secondary",
           type: "button",
           onclick: handlers.onRecognize,
           disabled: recognizeDisabled,
-        }, [document.createRange().createContextualFragment(`${icon("send")} AmiVoiceへ送信`)]),
+        }, [
+          document.createRange().createContextualFragment(
+            speechRecProvider === "browser" && recording.transcript && !recording.isAmiVoice
+              ? `${icon("arrow-up-right")} AmiVoiceで高精度に修正`
+              : `${icon("send")} AmiVoiceへ送信`
+          )
+        ]),
       ]),
       el("audio", {
         class: "w-full mt-2",
@@ -147,9 +155,20 @@ export function LessonOutput(activeItem, handlers, { isAnyRecording, isRecording
         src: recording.blob ? URL.createObjectURL(recording.blob) : "",
       }),
       el("div", { class: "metric min-h-16 bg-white" }, [
-        el("p", { class: "field-label", text: "AmiVoice認識結果" }),
+        el("p", { 
+          class: "field-label flex items-center gap-1.5", 
+          html: recording.transcript
+            ? (recording.isAmiVoice
+              ? `<span class="inline-block w-2 h-2 rounded-full bg-[var(--blue)]"></span>AmiVoice認識結果 (高精度)`
+              : `<span class="inline-block w-2 h-2 rounded-full bg-[var(--green)]"></span>ブラウザ内蔵認識結果 (爆速)`)
+            : "音声認識結果"
+        }),
         el("p", { class: "mt-1 whitespace-pre-wrap text-sm font-semibold", id: "transcriptText", text: recording.transcript || "まだ認識していません。" }),
       ]),
+      // AmiVoiceキーが未設定かつブラウザ認識モードの時の親切なアナウンス
+      !amivoiceApiKey && speechRecProvider === "browser" && recording.transcript && !recording.isAmiVoice
+        ? el("p", { class: "text-[10px] text-slate-400 dark:text-slate-500 italic mt-0.5 text-center", text: "※右上の「設定」からAmiVoiceキーを設定すると、録音音声をAmiVoiceへ送信して高精度な文字起こしに修正できます。" })
+        : document.createTextNode(""),
       el("button", {
         class: "button button-primary w-full",
         type: "button",

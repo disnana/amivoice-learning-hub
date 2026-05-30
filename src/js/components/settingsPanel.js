@@ -271,9 +271,9 @@ export function SettingsPanel(settings, handlers) {
   // 1. 一般・プロバイダ設定エリア
   const generalArea = el("div", {
     id: "generalSettingsArea",
-    class: "settings-wide flex flex-col gap-4 mt-2"
+    class: "settings-wide flex flex-col gap-3 mt-1"
   }, [
-    el("div", { class: "settings-wide" }, [nativeLanguageField]),
+    nativeLanguageField,
 
     // 音声合成プロバイダ
     el("div", { class: "field settings-wide" }, [
@@ -285,12 +285,12 @@ export function SettingsPanel(settings, handlers) {
       ])
     ]),
 
-    el("div", { class: "settings-wide mt-0.5" }, [googleTtsModelTypeField]),
-    el("div", { class: "settings-wide mt-0.5" }, [ttsVoiceNameField]),
-    el("div", { class: "settings-wide mt-0.5" }, [googleTtsInfoPanel]),
+    googleTtsModelTypeField,
+    ttsVoiceNameField,
+    googleTtsInfoPanel,
 
     // 音声認識プロバイダ
-    el("div", { class: "field settings-wide mt-2" }, [
+    el("div", { class: "field settings-wide" }, [
       el("span", { class: "field-label", text: "音声認識プロバイダ" }),
       el("div", { class: "segmented", role: "tablist" }, [
         recBrowserBtn,
@@ -299,8 +299,8 @@ export function SettingsPanel(settings, handlers) {
       ])
     ]),
 
-    el("div", { class: "settings-wide mt-0.5" }, [amivoiceEnginePresetField]),
-    el("div", { class: "settings-wide mt-0.5" }, [amivoiceEngineField]),
+    amivoiceEnginePresetField,
+    amivoiceEngineField,
     amivoiceDetails
   ]);
 

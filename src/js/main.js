@@ -204,8 +204,6 @@ function render() {
         if (keyType === "gemini") updated.geminiApiKey = val;
         else if (keyType === "amivoice") {
           updated.amivoiceApiKey = val;
-          // キーが入力されたら、自動で音声認識プロバイダをAmiVoiceにする配慮
-          if (val) updated.speechRecProvider = "amivoice";
         }
         else if (keyType === "googleTts") updated.googleTtsApiKey = val;
 
@@ -224,8 +222,6 @@ function render() {
   if (state.ui?.wizardOpen) {
     const wizardEl = SetupWizard(state.settings, {
       onSave: (newSettings) => {
-        // AmiVoiceキーが入力された場合、自動的にAmiVoiceモードを有効化
-        newSettings.speechRecProvider = newSettings.amivoiceApiKey ? "amivoice" : "browser";
         updateSettings(newSettings);
         state.ui.wizardOpen = false;
         setStatus("セットアップが完了しました！");

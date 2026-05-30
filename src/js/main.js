@@ -82,6 +82,7 @@ function readSettingsFromDom() {
     amivoiceDetailsOpen: document.querySelector("#amivoiceDetails")
       ? Boolean(document.querySelector("#amivoiceDetails").open)
       : state.settings.amivoiceDetailsOpen,
+    speechRecProvider: document.querySelector("#speechRecProvider")?.value || state.settings.speechRecProvider || "browser",
   };
 }
 
@@ -175,6 +176,8 @@ function render() {
   if (state.ui?.wizardOpen) {
     const wizardEl = SetupWizard(state.settings, {
       onSave: (newSettings) => {
+        // AmiVoiceキーが入力された場合、自動的にAmiVoiceモードを有効化
+        newSettings.speechRecProvider = newSettings.amivoiceApiKey ? "amivoice" : "browser";
         updateSettings(newSettings);
         state.ui.wizardOpen = false;
         setStatus("セットアップが完了しました！");
@@ -357,8 +360,8 @@ async function handleToggleRecord() {
   const item = state.lesson?.items?.[activeIdx];
   if (!item) return;
 
-  // AmiVoice APIキーがある場合は、従来のMediaRecorder録音処理
-  if (state.settings.amivoiceApiKey) {
+  // AmiVoiceモードかつAPIキーがある場合は、従来のMediaRecorder録音処理
+  if (state.settings.speechRecProvider === "amivoice" && state.settings.amivoiceApiKey) {
     try {
       const isAnyRec = isRecording();
       if (isAnyRec && recordingIndex !== activeIdx) {
@@ -488,17 +491,21 @@ async function handleToggleRecord() {
 async function handleRecognize() {
   const activeIdx = state.activeLessonIndex;
   const item = state.lesson?.items?.[activeIdx];
-  if (!item || !item.recording?.blob) return;
+  if (!item) return;
 
-  // AmiVoice APIキーがない場合の制御
-  if (!state.settings.amivoiceApiKey) {
+  // ブラウザ認識モード（またはAmiVoiceキー未設定）の場合はAmiVoiceへ送信しない
+  const useAmiVoice = state.settings.speechRecProvider === "amivoice" && state.settings.amivoiceApiKey;
+  if (!useAmiVoice) {
     if (item.recording?.transcript) {
-      setStatus("すでにブラウザ内蔵の音声認識による文字起こしが完了しています。そのまま評価へ進めます。");
+      setStatus("ブラウザ内蔵音声認識による文字起こしが完了しています。そのまま評価へ進めます。");
     } else {
-      setStatus("AmiVoiceキーが未設定のため文字起こしを実行できません。録音時にブラウザで文字起こしするか、AmiVoiceキーを設定してください。");
+      setStatus("ブラウザ認識モードです。マイクボタンを押して音読してください（文字起こしが自動で完了します）。");
     }
     return;
   }
+
+  // AmiVoiceモード: blobがない場合は録音がまだ
+  if (!item.recording?.blob) return;
 
   try {
     updateSettings(readSettingsFromDom());

@@ -102,6 +102,7 @@ export function SettingsPanel(settings, handlers) {
     type: "password",
     placeholder: "APPKEY",
   });
+  amivoiceApiKeyField.id = "amivoiceApiKey-wrapper";
 
   const amivoiceEnginePresetField = selectField({
     id: "amivoiceEnginePreset",
@@ -109,6 +110,7 @@ export function SettingsPanel(settings, handlers) {
     value: selectedAmiVoiceEngine,
     options: AMIVOICE_ENGINES,
   });
+  amivoiceEnginePresetField.id = "amivoiceEnginePreset-wrapper";
 
   const amivoiceEngineField = inputField({
     id: "amivoiceEngine",
@@ -185,6 +187,29 @@ export function SettingsPanel(settings, handlers) {
     value: provider,
   });
 
+  // 音声認識プロバイダ
+  const recProvider = settings.speechRecProvider || "browser";
+
+  const recBrowserBtn = el("button", {
+    id: "recProviderBrowserBtn",
+    class: `segment ${recProvider === "browser" ? "is-active" : ""}`,
+    type: "button",
+    text: "内蔵認識(爆速)",
+  });
+
+  const recAmiVoiceBtn = el("button", {
+    id: "recProviderAmiVoiceBtn",
+    class: `segment ${recProvider === "amivoice" ? "is-active" : ""}`,
+    type: "button",
+    text: "AmiVoice(高精度)",
+  });
+
+  const recProviderInput = el("input", {
+    id: "speechRecProvider",
+    type: "hidden",
+    value: recProvider,
+  });
+
   const panel = el("aside", { class: "settings-form" }, [
     el("span", { class: "status-pill settings-badge" }, [document.createRange().createContextualFragment(`${icon("key-round")} BYO API`)]),
     
@@ -217,16 +242,28 @@ export function SettingsPanel(settings, handlers) {
     geminiModelCustomField,
     geminiApiKeyField,
 
-    el("div", { class: "segmented settings-wide", role: "tablist" }, [
-      ttsBrowserBtn,
-      ttsGoogleBtn,
-      ttsProviderInput
+    el("div", { class: "field settings-wide" }, [
+      el("span", { class: "field-label", text: "音声合成 (TTS) プロバイダ" }),
+      el("div", { class: "segmented", role: "tablist" }, [
+        ttsBrowserBtn,
+        ttsGoogleBtn,
+        ttsProviderInput
+      ])
     ]),
 
     googleTtsApiKeyField,
     googleTtsModelTypeField,
     ttsVoiceNameField,
     googleTtsInfoPanel,
+
+    el("div", { class: "field settings-wide" }, [
+      el("span", { class: "field-label", text: "音声認識プロバイダ" }),
+      el("div", { class: "segmented", role: "tablist" }, [
+        recBrowserBtn,
+        recAmiVoiceBtn,
+        recProviderInput
+      ])
+    ]),
 
     amivoiceApiKeyField,
     amivoiceEnginePresetField,
@@ -309,6 +346,27 @@ export function SettingsPanel(settings, handlers) {
       toggleField("#ttsVoiceName-wrapper", prov === "google" && e.target.value === "custom");
     });
   }
+
+  // 音声認識プロバイダ切り替え
+  const handleRecProviderChange = (prov) => {
+    recBrowserBtn.classList.toggle("is-active", prov === "browser");
+    recAmiVoiceBtn.classList.toggle("is-active", prov === "amivoice");
+    recProviderInput.value = prov;
+
+    const isAmi = prov === "amivoice";
+    toggleField("#amivoiceApiKey-wrapper", isAmi);
+    toggleField("#amivoiceEnginePreset-wrapper", isAmi);
+    
+    const isCustomEngine = panel.querySelector("#amivoiceEnginePreset")?.value === "custom";
+    toggleField("#amivoiceEngine-wrapper", isAmi && isCustomEngine);
+    toggleField("#amivoiceDetails", isAmi);
+  };
+
+  recBrowserBtn.addEventListener("click", () => handleRecProviderChange("browser"));
+  recAmiVoiceBtn.addEventListener("click", () => handleRecProviderChange("amivoice"));
+
+  // 初期読み込み時のトグル状態の適用
+  handleRecProviderChange(recProvider);
 
   // AmiVoiceエンジン変更
   const selectAmiVoicePreset = panel.querySelector("#amivoiceEnginePreset");

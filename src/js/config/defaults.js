@@ -14,6 +14,7 @@ export const DEFAULT_SETTINGS = {
   geminiModel: "gemini-flash-latest",
   geminiModelMode: "preset",
   ttsProvider: "browser",
+  speechRecProvider: "browser",
   googleTtsModelType: "default",
   ttsVoiceName: "",
   ttsSpeakingRate: 0.86,

@@ -13,6 +13,8 @@ import { HistoryPanel } from "./components/historyPanel.js";
 import { LessonForm } from "./components/lessonForm.js";
 import { LessonOutput } from "./components/lessonOutput.js";
 import { SettingsPanel } from "./components/settingsPanel.js";
+import { SetupWizard } from "./components/setupWizard.js";
+import { STORAGE_KEY } from "./config/defaults.js";
 import { toggleRecording, isRecording } from "./controllers/recorderController.js";
 import { AMIVOICE_ENGINES } from "./data/models.js";
 import { buildEvaluationPrompt } from "./prompts/evaluationPrompt.js";
@@ -26,6 +28,9 @@ const app = document.querySelector("#app");
 let recordingIndex = null; // 現在どのインデックスのカードが録音中か
 let currentAudio = null; // 現在再生中のオーディオオブジェクト (Google TTS用)
 let isQueuePlaying = false; // 連続再生中かどうかのフラグ
+let speechRecInstance = null; // ブラウザ内蔵音声認識インスタンス
+let tempTranscript = ""; // 一時的な文字起こし文字列
+let isBrowserSpeechRecActive = false; // ブラウザ音声認識がアクティブかどうかのフラグ
 
 function readSettingsFromDom() {
   const hasSettingsModal = Boolean(document.querySelector("#geminiApiKey"));
@@ -98,10 +103,10 @@ function render() {
   if (currentSourceText) state.sourceText = currentSourceText.value;
 
   const activeItem = state.lesson?.items?.[state.activeLessonIndex] || null;
-  const isAnyRec = isRecording();
+  const isAnyRec = isRecording() || isBrowserSpeechRecActive;
   const isRecThis = isAnyRec && recordingIndex === state.activeLessonIndex;
 
-  app.replaceChildren(AppLayout({
+  const layoutEl = AppLayout({
     settingsPanel: SettingsPanel(state.settings, {
       onSave: () => {
         updateSettings(readSettingsFromDom());
@@ -114,6 +119,12 @@ function render() {
       },
       onTtsProvider: (provider) => {
         // タブ切り替えもローカルで行われるため、全体再描画は不要。
+      },
+      onStartWizard: () => {
+        state.ui ||= {};
+        state.ui.wizardOpen = true;
+        state.ui.settingsOpen = false;
+        render();
       },
     }),
     lessonForm: LessonForm(state.settings, {
@@ -159,7 +170,27 @@ function render() {
       state.ui.settingsOpen = false;
       render();
     },
-  }));
+  });
+
+  if (state.ui?.wizardOpen) {
+    const wizardEl = SetupWizard(state.settings, {
+      onSave: (newSettings) => {
+        updateSettings(newSettings);
+        state.ui.wizardOpen = false;
+        setStatus("セットアップが完了しました！");
+        render();
+      },
+      onSkip: () => {
+        updateSettings(state.settings);
+        state.ui.wizardOpen = false;
+        setStatus("セットアップをスキップしました（デモモード）。");
+        render();
+      }
+    });
+    app.replaceChildren(layoutEl, wizardEl);
+  } else {
+    app.replaceChildren(layoutEl);
+  }
   setStatus(state.status);
   setIconRoot(app);
   // DOM置換後にフォームの入力値を復元
@@ -326,40 +357,131 @@ async function handleToggleRecord() {
   const item = state.lesson?.items?.[activeIdx];
   if (!item) return;
 
-  try {
-    const isAnyRec = isRecording();
-    if (isAnyRec && recordingIndex !== activeIdx) {
-      return; // 別のカードが録音中
-    }
+  // AmiVoice APIキーがある場合は、従来のMediaRecorder録音処理
+  if (state.settings.amivoiceApiKey) {
+    try {
+      const isAnyRec = isRecording();
+      if (isAnyRec && recordingIndex !== activeIdx) {
+        return; // 別のカードが録音中
+      }
 
-    await toggleRecording({
-      onStarted: () => {
-        recordingIndex = activeIdx;
-        setStatus("録音中...");
-        render();
-      },
-      onStopped: (blob, mimeType) => {
-        if (state.lesson?.items?.[activeIdx]) {
-          state.lesson.items[activeIdx].recording = {
-            blob,
-            mimeType,
-            transcript: "",
-          };
-          state.lesson.items[activeIdx].status = "idle";
-          state.lesson.items[activeIdx].error = "";
-        }
-        recordingIndex = null;
-        setStatus(`録音しました: ${mimeType}`);
-        render();
-      },
-    });
-  } catch (error) {
-    if (state.lesson?.items?.[activeIdx]) {
-      state.lesson.items[activeIdx].error = asMessage(error);
+      await toggleRecording({
+        onStarted: () => {
+          recordingIndex = activeIdx;
+          setStatus("録音中...");
+          render();
+        },
+        onStopped: (blob, mimeType) => {
+          if (state.lesson?.items?.[activeIdx]) {
+            state.lesson.items[activeIdx].recording = {
+              blob,
+              mimeType,
+              transcript: "",
+            };
+            state.lesson.items[activeIdx].status = "idle";
+            state.lesson.items[activeIdx].error = "";
+          }
+          recordingIndex = null;
+          setStatus(`録音しました: ${mimeType}`);
+          render();
+        },
+      });
+    } catch (error) {
+      if (state.lesson?.items?.[activeIdx]) {
+        state.lesson.items[activeIdx].error = asMessage(error);
+      }
+      recordingIndex = null;
+      setStatus(asMessage(error));
+      render();
     }
-    recordingIndex = null;
-    setStatus(asMessage(error));
-    render();
+  } 
+  // AmiVoice APIキーがない場合、ブラウザ音声認識(Web Speech API)を単独で起動（マイク競合を回避し、かつリアルタイム文字起こし）
+  else {
+    try {
+      if (isBrowserSpeechRecActive) {
+        // すでにブラウザ音声認識が起動している場合は、停止処理
+        if (speechRecInstance) {
+          try {
+            speechRecInstance.stop();
+          } catch (e) {}
+          speechRecInstance = null;
+        }
+        isBrowserSpeechRecActive = false;
+        recordingIndex = null;
+        setStatus("ブラウザ音声認識を完了しました。");
+        render();
+      } else {
+        // 新しくブラウザ音声認識を起動
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRecognition) {
+          throw new Error("お使いのブラウザは音声認識API（SpeechRecognition）に対応していません。ChromeまたはEdgeをご利用ください。");
+        }
+
+        isBrowserSpeechRecActive = true;
+        recordingIndex = activeIdx;
+        const targetLang = state.settings.targetLanguage || "英語";
+        setStatus(`音声認識中（ブラウザ内蔵）... ${targetLang}で喋ってください。`);
+        render();
+
+        speechRecInstance = new SpeechRecognition();
+        speechRecInstance.lang = targetLang === "英語" ? "en-US" : (targetLang === "日本語" ? "ja-JP" : "en-US");
+        speechRecInstance.continuous = false; // 一文練習に最適化し、Googleサーバーとの長時間コネクション切断エラー(network)を劇的に防止
+        speechRecInstance.interimResults = true; // リアルタイム入力を滑らかにするため true に
+
+        tempTranscript = "";
+
+        speechRecInstance.onresult = (event) => {
+          let interimTrans = "";
+          let finalTrans = "";
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTrans += event.results[i][0].transcript + " ";
+            } else {
+              interimTrans += event.results[i][0].transcript;
+            }
+          }
+          const fullText = (tempTranscript + finalTrans + interimTrans).trim();
+          
+          if (state.lesson?.items?.[activeIdx]) {
+            state.lesson.items[activeIdx].recording ||= { blob: null, mimeType: "" };
+            state.lesson.items[activeIdx].recording.transcript = fullText;
+            render(); // テキストエリアにリアルタイムでカタカタ入力されるように描画
+          }
+        };
+
+        speechRecInstance.onerror = (e) => {
+          console.error("SpeechRecognition error:", e);
+          if (e.error === "not-allowed") {
+            setStatus("マイクの使用が許可されていません。ブラウザのマイク権限を確認してください。");
+          } else if (e.error === "network") {
+            setStatus("ブラウザの音声認識サーバーとの接続でネットワークエラーが発生しました。再度お試しください。");
+            if (state.lesson?.items?.[activeIdx]) {
+              state.lesson.items[activeIdx].error = "音声認識サーバー一時エラー。もう一度お試しいただくか、Chromeブラウザの使用、またはAmiVoiceキーの登録をご検討ください。";
+            }
+          } else {
+            setStatus(`音声認識エラー: ${e.error}`);
+          }
+          isBrowserSpeechRecActive = false;
+          recordingIndex = null;
+          render();
+        };
+
+        speechRecInstance.onend = () => {
+          // 認識が終了したときのクリーンアップ
+          isBrowserSpeechRecActive = false;
+          recordingIndex = null;
+          setStatus("音声認識が終了しました。そのまま評価へ進めます。");
+          render();
+        };
+
+        speechRecInstance.start();
+      }
+    } catch (error) {
+      isBrowserSpeechRecActive = false;
+      recordingIndex = null;
+      setStatus(asMessage(error));
+      render();
+    }
   }
 }
 
@@ -367,6 +489,16 @@ async function handleRecognize() {
   const activeIdx = state.activeLessonIndex;
   const item = state.lesson?.items?.[activeIdx];
   if (!item || !item.recording?.blob) return;
+
+  // AmiVoice APIキーがない場合の制御
+  if (!state.settings.amivoiceApiKey) {
+    if (item.recording?.transcript) {
+      setStatus("すでにブラウザ内蔵の音声認識による文字起こしが完了しています。そのまま評価へ進めます。");
+    } else {
+      setStatus("AmiVoiceキーが未設定のため文字起こしを実行できません。録音時にブラウザで文字起こしするか、AmiVoiceキーを設定してください。");
+    }
+    return;
+  }
 
   try {
     updateSettings(readSettingsFromDom());
@@ -469,6 +601,12 @@ async function handleEvaluate() {
     setStatus(asMessage(error));
     render();
   }
+}
+
+const isFirstLaunch = !localStorage.getItem(STORAGE_KEY);
+if (isFirstLaunch) {
+  state.ui ||= {};
+  state.ui.wizardOpen = true;
 }
 
 try {

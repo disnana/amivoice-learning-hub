@@ -248,12 +248,17 @@ export function SettingsPanel(settings, handlers) {
       ]),
     ]),
 
-    el("div", { class: "settings-actions settings-wide" }, [
+    el("div", { class: "settings-actions settings-wide flex flex-col gap-2" }, [
       el("button", {
-        class: "button button-primary",
+        class: "button button-primary w-full",
         type: "button",
         onclick: handlers.onSave,
       }, [document.createRange().createContextualFragment(`${icon("save")} 保存`)]),
+      el("button", {
+        class: "w-full py-2.5 px-4 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 font-bold text-xs flex items-center justify-center gap-1.5 transition-all",
+        type: "button",
+        onclick: handlers.onStartWizard,
+      }, [document.createRange().createContextualFragment(`${icon("navigation")} 初期セットアップガイドを起動`)]),
     ]),
   ]);
 

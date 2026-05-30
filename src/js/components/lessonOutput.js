@@ -167,7 +167,13 @@ export function LessonOutput(activeItem, handlers, { isAnyRecording, isRecording
       ]),
       // AmiVoiceキーが未設定かつブラウザ認識モードの時の親切なアナウンス
       !amivoiceApiKey && speechRecProvider === "browser" && recording.transcript && !recording.isAmiVoice
-        ? el("p", { class: "text-[10px] text-slate-400 dark:text-slate-500 italic mt-0.5 text-center", text: "※右上の「設定」からAmiVoiceキーを設定すると、録音音声をAmiVoiceへ送信して高精度な文字起こしに修正できます。" })
+        ? el("button", {
+            type: "button",
+            class: "w-full text-[10.5px] text-[var(--blue)] font-bold mt-1.5 mb-0.5 text-center hover:underline cursor-pointer bg-transparent border-0 flex items-center justify-center gap-1 transition-all",
+            onclick: () => handlers.onOpenSettings("amivoiceApiKey")
+          }, [
+            document.createRange().createContextualFragment(`${icon("key-round")} AmiVoice APIキーを設定して、高精度な再文字起こしを利用する`)
+          ])
         : document.createTextNode(""),
       el("button", {
         class: "button button-primary w-full",

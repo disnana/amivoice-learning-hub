@@ -12,6 +12,10 @@ export function SettingsPanel(settings, handlers) {
     ? "custom"
     : settings.amivoiceEngine;
 
+  const hasGemini = Boolean(settings.geminiApiKey?.trim());
+  const hasAmiVoice = Boolean(settings.amivoiceApiKey?.trim());
+  const hasGoogleTts = Boolean(settings.googleTtsApiKey?.trim());
+
   // 1. 各フィールドをあらかじめ生成し、IDと初期表示を設定する
 
   const nativeLanguageField = selectField({
@@ -56,7 +60,6 @@ export function SettingsPanel(settings, handlers) {
     placeholder: "ブラウザ直叩きが通る場合に使用",
   });
   googleTtsApiKeyField.id = "googleTtsApiKey-wrapper";
-  if (provider !== "google") googleTtsApiKeyField.classList.add("hidden");
 
   const googleTtsModelTypeField = selectField({
     id: "googleTtsModelType",
@@ -210,38 +213,69 @@ export function SettingsPanel(settings, handlers) {
     value: recProvider,
   });
 
-  const panel = el("aside", { class: "settings-form" }, [
-    el("span", { class: "status-pill settings-badge" }, [document.createRange().createContextualFragment(`${icon("key-round")} BYO API`)]),
-    
-    // APIガイド
-    el("div", { class: "settings-wide panel-muted text-[11px] space-y-1.5 p-2.5 rounded border border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 mb-2" }, [
-      el("p", { class: "font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1" }, [
-        document.createRange().createContextualFragment(`${icon("help-circle")} 🔑 APIキーの取得ガイド`)
-      ]),
-      el("ul", { class: "list-disc list-inside space-y-1.5 text-[10.5px] leading-relaxed" }, [
-        el("li", {}, [
-          document.createTextNode("Gemini APIキー: "),
-          el("a", { href: "https://aistudio.google.com/api-keys", target: "_blank", class: "text-[var(--blue)] hover:underline font-medium", text: "Google AI Studio" }),
-          document.createTextNode(" から無料で作成できます。")
-        ]),
-        el("li", {}, [
-          document.createTextNode("AmiVoice APIキー: "),
-          el("a", { href: "https://acp.amivoice.com/", target: "_blank", class: "text-[var(--blue)] hover:underline font-medium", text: "AmiVoice Cloud Platform" }),
-          document.createTextNode(" から会員登録して取得（毎月無料枠あり）。")
-        ]),
-        el("li", {}, [
-          document.createTextNode("Google TTS: "),
-          el("a", { href: "https://console.cloud.google.com/", target: "_blank", class: "text-[var(--blue)] hover:underline font-medium", text: "Google Cloud Console" }),
-          document.createTextNode(" から「Text-to-Speech API」を有効化してキーを取得してください。")
-        ])
-      ])
+  // タブ切り替えボタン
+  const tabGeneralBtn = el("button", {
+    id: "tabGeneralBtn",
+    class: "segment is-active",
+    type: "button",
+    text: "⚙️ 一般・プロバイダ設定",
+  });
+
+  const tabApiKeysBtn = el("button", {
+    id: "tabApiKeysBtn",
+    class: "segment",
+    type: "button",
+    text: "🔑 API接続・キー設定",
+  });
+
+  // APIガイド（APIキー設定タブで表示）
+  const apiGuidePanel = el("div", { class: "settings-wide panel-muted text-[11px] space-y-1.5 p-2.5 rounded border border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 mb-1" }, [
+    el("p", { class: "font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1" }, [
+      document.createRange().createContextualFragment(`${icon("help-circle")} 🔑 APIキーの取得ガイド`)
     ]),
+    el("ul", { class: "list-disc list-inside space-y-1.5 text-[10.5px] leading-relaxed" }, [
+      el("li", {}, [
+        document.createTextNode("Gemini APIキー: "),
+        el("a", { href: "https://aistudio.google.com/api-keys", target: "_blank", class: "text-[var(--blue)] hover:underline font-medium", text: "Google AI Studio" }),
+        document.createTextNode(" から無料で作成できます。")
+      ]),
+      el("li", {}, [
+        document.createTextNode("AmiVoice APIキー: "),
+        el("a", { href: "https://acp.amivoice.com/", target: "_blank", class: "text-[var(--blue)] hover:underline font-medium", text: "AmiVoice Cloud Platform" }),
+        document.createTextNode(" から会員登録して取得（毎月無料枠あり）。")
+      ]),
+      el("li", {}, [
+        document.createTextNode("Google TTS: "),
+        el("a", { href: "https://console.cloud.google.com/", target: "_blank", class: "text-[var(--blue)] hover:underline font-medium", text: "Google Cloud Console" }),
+        document.createTextNode(" から「Text-to-Speech API」を有効化してキーを取得してください。")
+      ])
+    ])
+  ]);
 
-    nativeLanguageField,
-    geminiModelField,
-    geminiModelCustomField,
-    geminiApiKeyField,
+  // アコーディオン要素
+  const amivoiceDetails = el("details", {
+    id: "amivoiceDetails",
+    class: "settings-advanced settings-wide",
+    open: settings.amivoiceDetailsOpen || false,
+  }, [
+    el("summary", { text: "AmiVoice詳細設定" }),
+    el("div", { class: "settings-advanced-grid" }, [
+      amivoiceLoggingOptOutField,
+      amivoiceUseRawParamsField,
+      amivoiceRawParamsField,
+      amivoiceUseProfileWordsField,
+      amivoiceProfileWordsField
+    ]),
+  ]);
 
+  // 1. 一般・プロバイダ設定エリア
+  const generalArea = el("div", {
+    id: "generalSettingsArea",
+    class: "settings-wide flex flex-col gap-4 mt-2"
+  }, [
+    el("div", { class: "settings-wide" }, [nativeLanguageField]),
+
+    // 音声合成プロバイダ
     el("div", { class: "field settings-wide" }, [
       el("span", { class: "field-label", text: "音声合成 (TTS) プロバイダ" }),
       el("div", { class: "segmented", role: "tablist" }, [
@@ -251,12 +285,12 @@ export function SettingsPanel(settings, handlers) {
       ])
     ]),
 
-    googleTtsApiKeyField,
-    googleTtsModelTypeField,
-    ttsVoiceNameField,
-    googleTtsInfoPanel,
+    el("div", { class: "settings-wide mt-0.5" }, [googleTtsModelTypeField]),
+    el("div", { class: "settings-wide mt-0.5" }, [ttsVoiceNameField]),
+    el("div", { class: "settings-wide mt-0.5" }, [googleTtsInfoPanel]),
 
-    el("div", { class: "field settings-wide" }, [
+    // 音声認識プロバイダ
+    el("div", { class: "field settings-wide mt-2" }, [
       el("span", { class: "field-label", text: "音声認識プロバイダ" }),
       el("div", { class: "segmented", role: "tablist" }, [
         recBrowserBtn,
@@ -265,25 +299,121 @@ export function SettingsPanel(settings, handlers) {
       ])
     ]),
 
-    amivoiceApiKeyField,
-    amivoiceEnginePresetField,
-    amivoiceEngineField,
+    el("div", { class: "settings-wide mt-0.5" }, [amivoiceEnginePresetField]),
+    el("div", { class: "settings-wide mt-0.5" }, [amivoiceEngineField]),
+    amivoiceDetails
+  ]);
 
-    // 詳細アコーディオン
-    el("details", {
-      id: "amivoiceDetails",
-      class: "settings-advanced settings-wide",
-      open: settings.amivoiceDetailsOpen || false,
-    }, [
-      el("summary", { text: "AmiVoice詳細" }),
-      el("div", { class: "settings-advanced-grid" }, [
-        amivoiceLoggingOptOutField,
-        amivoiceUseRawParamsField,
-        amivoiceRawParamsField,
-        amivoiceUseProfileWordsField,
-        amivoiceProfileWordsField
+  // 2. API接続・キー設定エリア
+  const apiKeysArea = el("div", {
+    id: "apiKeysArea",
+    class: "settings-wide flex flex-col gap-4 mt-2 hidden"
+  }, [
+    apiGuidePanel,
+
+    // Gemini
+    el("div", { class: "settings-wide p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 space-y-4 mt-1" }, [
+      el("div", { class: "flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2" }, [
+        document.createRange().createContextualFragment(`${icon("cpu")} <span class="font-bold text-xs text-[var(--green)] uppercase tracking-wider">Gemini AI 設定</span>`)
       ]),
+      geminiApiKeyField,
+      geminiModelField,
+      geminiModelCustomField
     ]),
+
+    // AmiVoice
+    el("div", { class: "settings-wide p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 space-y-4 mt-1" }, [
+      el("div", { class: "flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2" }, [
+        document.createRange().createContextualFragment(`${icon("mic")} <span class="font-bold text-xs text-[var(--blue)] uppercase tracking-wider">AmiVoice 設定</span>`)
+      ]),
+      amivoiceApiKeyField,
+      el("p", { class: "text-[10px] text-slate-400 dark:text-slate-500 italic mt-1 leading-normal", text: "※マイク入力音声をAmiVoice ACPサーバーに送信し、高精度な文字起こしを生成するためのAPIキーです。" })
+    ]),
+
+    // Google TTS (BYO API)
+    el("div", { class: "settings-wide p-3.5 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/30 space-y-4 mt-1" }, [
+      el("div", { class: "flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2" }, [
+        document.createRange().createContextualFragment(`${icon("volume-2")} <span class="font-bold text-xs text-amber-500 uppercase tracking-wider">Google TTS 設定 (オプション)</span>`)
+      ]),
+      googleTtsApiKeyField,
+      el("p", { class: "text-[10px] text-slate-400 dark:text-slate-500 italic mt-1 leading-normal", text: "※Google Cloud TTS (有料・超高品質音声) を直接使用したい場合に入力します（未入力ならブラウザ内蔵音声）。" })
+    ])
+  ]);
+
+  const switchTab = (tabName) => {
+    if (tabName === "general") {
+      tabGeneralBtn.classList.add("is-active");
+      tabApiKeysBtn.classList.remove("is-active");
+      generalArea.classList.remove("hidden");
+      apiKeysArea.classList.add("hidden");
+    } else {
+      tabGeneralBtn.classList.remove("is-active");
+      tabApiKeysBtn.classList.add("is-active");
+      generalArea.classList.add("hidden");
+      apiKeysArea.classList.remove("hidden");
+    }
+  };
+
+  tabGeneralBtn.addEventListener("click", () => switchTab("general"));
+  tabApiKeysBtn.addEventListener("click", () => switchTab("apikeys"));
+
+  const panel = el("aside", { class: "settings-form" }, [
+    el("span", { class: "status-pill settings-badge" }, [document.createRange().createContextualFragment(`${icon("key-round")} BYO API`)]),
+    
+    // APIキー設定状況ステータスパネル
+    el("div", { class: "settings-wide flex flex-col gap-2 p-2.5 rounded-lg bg-slate-100/60 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-700/50 text-xs mb-1" }, [
+      el("div", { class: "flex items-center gap-1 font-bold text-slate-700 dark:text-slate-200 text-[11px]" }, [
+        document.createRange().createContextualFragment(`${icon("key-round")} 🔑 APIキー接続ステータス`)
+      ]),
+      el("div", { class: "grid grid-cols-3 gap-1.5 mt-1" }, [
+        el("button", {
+          type: "button",
+          class: `py-1.5 px-2 rounded-md text-[10px] font-black transition-all flex flex-col items-center justify-center gap-1 shadow-sm border ${hasGemini ? "bg-emerald-50/80 text-emerald-700 border-emerald-200/60 hover:bg-emerald-100/90 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/40" : "bg-rose-50/80 text-rose-700 border-rose-200/60 hover:bg-rose-100/90 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/40 border-dashed"}`,
+          onclick: () => {
+            if (handlers.onOpenQuickKeyModal) {
+              handlers.onOpenQuickKeyModal("gemini");
+            }
+          }
+        }, [
+          el("span", { class: "font-bold text-[9px] opacity-75", text: "Gemini AI" }),
+          el("span", { class: "font-black text-[10px]", text: hasGemini ? "🟢 接続完了" : "🔴 未設定" })
+        ]),
+        el("button", {
+          type: "button",
+          class: `py-1.5 px-2 rounded-md text-[10px] font-black transition-all flex flex-col items-center justify-center gap-1 shadow-sm border ${hasAmiVoice ? "bg-emerald-50/80 text-emerald-700 border-emerald-200/60 hover:bg-emerald-100/90 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/40" : "bg-rose-50/80 text-rose-700 border-rose-200/60 hover:bg-rose-100/90 dark:bg-rose-950/20 dark:text-rose-400 dark:border-rose-900/40 border-dashed"}`,
+          onclick: () => {
+            if (handlers.onOpenQuickKeyModal) {
+              handlers.onOpenQuickKeyModal("amivoice");
+            }
+          }
+        }, [
+          el("span", { class: "font-bold text-[9px] opacity-75", text: "AmiVoice" }),
+          el("span", { class: "font-black text-[10px]", text: hasAmiVoice ? "🟢 接続完了" : "🔴 未設定" })
+        ]),
+        el("button", {
+          type: "button",
+          class: `py-1.5 px-2 rounded-md text-[10px] font-black transition-all flex flex-col items-center justify-center gap-1 shadow-sm border ${hasGoogleTts ? "bg-emerald-50/80 text-emerald-700 border-emerald-200/60 hover:bg-emerald-100/90 dark:bg-emerald-950/20 dark:text-emerald-400 dark:border-emerald-900/40" : "bg-amber-50/80 text-amber-700 border-amber-200/60 hover:bg-amber-100/90 dark:bg-amber-950/20 dark:text-amber-400 dark:border-amber-900/40 border-dashed"}`,
+          onclick: () => {
+            if (handlers.onOpenQuickKeyModal) {
+              handlers.onOpenQuickKeyModal("googleTts");
+            }
+          }
+        }, [
+          el("span", { class: "font-bold text-[9px] opacity-75", text: "Google TTS" }),
+          el("span", { class: "font-black text-[10px]", text: hasGoogleTts ? "🟢 接続完了" : "🟡 オプション" })
+        ])
+      ])
+    ]),
+
+    // タブ切り替えセグメント
+    el("div", { class: "segmented settings-wide mb-2 mt-2", role: "tablist" }, [
+      tabGeneralBtn,
+      tabApiKeysBtn
+    ]),
+
+    // 各コンテンツエリア
+    generalArea,
+    apiKeysArea,
 
     el("div", { class: "settings-actions settings-wide flex flex-col gap-2" }, [
       el("button", {
@@ -327,7 +457,6 @@ export function SettingsPanel(settings, handlers) {
     ttsProviderInput.value = prov;
 
     const isGoogle = prov === "google";
-    toggleField("#googleTtsApiKey-wrapper", isGoogle);
     toggleField("#googleTtsModelType-wrapper", isGoogle);
     
     const isCustomModel = panel.querySelector("#googleTtsModelType")?.value === "custom";
@@ -354,7 +483,6 @@ export function SettingsPanel(settings, handlers) {
     recProviderInput.value = prov;
 
     const isAmi = prov === "amivoice";
-    toggleField("#amivoiceApiKey-wrapper", isAmi);
     toggleField("#amivoiceEnginePreset-wrapper", isAmi);
     
     const isCustomEngine = panel.querySelector("#amivoiceEnginePreset")?.value === "custom";

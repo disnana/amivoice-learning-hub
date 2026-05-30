@@ -14,6 +14,7 @@ import { LessonForm } from "./components/lessonForm.js";
 import { LessonOutput } from "./components/lessonOutput.js";
 import { SettingsPanel } from "./components/settingsPanel.js";
 import { SetupWizard } from "./components/setupWizard.js";
+import { QuickKeyModal } from "./components/quickKeyModal.js";
 import { STORAGE_KEY } from "./config/defaults.js";
 import { toggleRecording, isRecording } from "./controllers/recorderController.js";
 import { AMIVOICE_ENGINES } from "./data/models.js";
@@ -127,6 +128,11 @@ function render() {
         state.ui.settingsOpen = false;
         render();
       },
+      onOpenQuickKeyModal: (keyType) => {
+        state.ui ||= {};
+        state.ui.quickKeyModal = { open: true, keyType };
+        render();
+      },
     }),
     lessonForm: LessonForm(state.settings, {
       onGenerate: handleGenerateLesson,
@@ -144,6 +150,12 @@ function render() {
         state.settings.ttsSpeakingRate = speed;
         const slider = document.querySelector("#ttsSpeakingRate");
         if (slider) slider.value = speed;
+        render();
+      },
+      onOpenSettings: (target) => {
+        state.ui ||= {};
+        const keyType = target === "amivoiceApiKey" ? "amivoice" : (target === "geminiApiKey" ? "gemini" : "googleTts");
+        state.ui.quickKeyModal = { open: true, keyType };
         render();
       },
     }, {
@@ -175,6 +187,40 @@ function render() {
     },
   });
 
+  // 簡易キー設定ポップアップのレンダリング
+  let quickKeyModalEl = null;
+  if (state.ui?.quickKeyModal?.open) {
+    const keyType = state.ui.quickKeyModal.keyType;
+    let initialValue = "";
+    if (keyType === "gemini") initialValue = state.settings.geminiApiKey;
+    else if (keyType === "amivoice") initialValue = state.settings.amivoiceApiKey;
+    else if (keyType === "googleTts") initialValue = state.settings.googleTtsApiKey;
+
+    quickKeyModalEl = QuickKeyModal({
+      keyType,
+      initialValue,
+      onSave: (val) => {
+        const updated = { ...state.settings };
+        if (keyType === "gemini") updated.geminiApiKey = val;
+        else if (keyType === "amivoice") {
+          updated.amivoiceApiKey = val;
+          // キーが入力されたら、自動で音声認識プロバイダをAmiVoiceにする配慮
+          if (val) updated.speechRecProvider = "amivoice";
+        }
+        else if (keyType === "googleTts") updated.googleTtsApiKey = val;
+
+        updateSettings(updated);
+        state.ui.quickKeyModal.open = false;
+        setStatus("APIキーを保存しました。");
+        render();
+      },
+      onClose: () => {
+        state.ui.quickKeyModal.open = false;
+        render();
+      }
+    });
+  }
+
   if (state.ui?.wizardOpen) {
     const wizardEl = SetupWizard(state.settings, {
       onSave: (newSettings) => {
@@ -193,6 +239,8 @@ function render() {
       }
     });
     app.replaceChildren(layoutEl, wizardEl);
+  } else if (quickKeyModalEl) {
+    app.replaceChildren(layoutEl, quickKeyModalEl);
   } else {
     app.replaceChildren(layoutEl);
   }

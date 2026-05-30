@@ -74,6 +74,9 @@ function readSettingsFromDom() {
       ? Boolean(document.querySelector("#amivoiceUseProfileWords").checked)
       : state.settings.amivoiceUseProfileWords,
     amivoiceProfileWords: document.querySelector("#amivoiceProfileWords")?.value || state.settings.amivoiceProfileWords || "",
+    amivoiceDetailsOpen: document.querySelector("#amivoiceDetails")
+      ? Boolean(document.querySelector("#amivoiceDetails").open)
+      : state.settings.amivoiceDetailsOpen,
   };
 }
 

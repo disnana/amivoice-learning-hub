@@ -13,6 +13,28 @@ export function SettingsPanel(settings, handlers) {
     : settings.amivoiceEngine;
   return el("aside", { class: "settings-form" }, [
     el("span", { class: "status-pill settings-badge" }, [document.createRange().createContextualFragment(`${icon("key-round")} BYO API`)]),
+    el("div", { class: "settings-wide panel-muted text-[11px] space-y-1.5 p-2.5 rounded border border-slate-100 dark:border-slate-800 text-slate-500 dark:text-slate-400 mb-2" }, [
+      el("p", { class: "font-bold text-slate-700 dark:text-slate-200 flex items-center gap-1" }, [
+        document.createRange().createContextualFragment(`${icon("help-circle")} 🔑 APIキーの取得ガイド`)
+      ]),
+      el("ul", { class: "list-disc list-inside space-y-1.5 text-[10.5px] leading-relaxed" }, [
+        el("li", {}, [
+          document.createTextNode("Gemini APIキー: "),
+          el("a", { href: "https://aistudio.google.com/api-keys", target: "_blank", class: "text-[var(--blue)] hover:underline font-medium", text: "Google AI Studio" }),
+          document.createTextNode(" から無料で作成できます。")
+        ]),
+        el("li", {}, [
+          document.createTextNode("AmiVoice APIキー: "),
+          el("a", { href: "https://acp.amivoice.com/", target: "_blank", class: "text-[var(--blue)] hover:underline font-medium", text: "AmiVoice Cloud Platform" }),
+          document.createTextNode(" から会員登録して取得（毎月無料枠あり）。")
+        ]),
+        el("li", {}, [
+          document.createTextNode("Google TTS: "),
+          el("a", { href: "https://console.cloud.google.com/", target: "_blank", class: "text-[var(--blue)] hover:underline font-medium", text: "Google Cloud Console" }),
+          document.createTextNode(" から「Text-to-Speech API」を有効化してキーを取得してください。")
+        ])
+      ])
+    ]),
     selectField({
       id: "nativeLanguage",
       label: "母国語",
@@ -110,7 +132,11 @@ export function SettingsPanel(settings, handlers) {
       value: settings.amivoiceEngine,
       placeholder: "-a-general",
     }) : document.createTextNode(""),
-    el("details", { class: "settings-advanced settings-wide" }, [
+    el("details", {
+      id: "amivoiceDetails",
+      class: "settings-advanced settings-wide",
+      open: settings.amivoiceDetailsOpen || false,
+    }, [
       el("summary", { text: "AmiVoice詳細" }),
       el("div", { class: "settings-advanced-grid" }, [
         checkboxField({

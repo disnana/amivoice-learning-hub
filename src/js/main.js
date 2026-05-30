@@ -110,12 +110,10 @@ function render() {
         render();
       },
       onOptionChange: () => {
-        updateSettings(readSettingsFromDom());
-        render();
+        // 設定画面ローカルでDOMがトグルされるため、全体再描画は不要。
       },
       onTtsProvider: (provider) => {
-        updateSettings({ ...readSettingsFromDom(), ttsProvider: provider });
-        render();
+        // タブ切り替えもローカルで行われるため、全体再描画は不要。
       },
     }),
     lessonForm: LessonForm(state.settings, {
